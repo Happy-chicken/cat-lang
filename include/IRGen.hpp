@@ -76,11 +76,11 @@ private:
     void createFunctionBlock(llvm::Function *fn);                                                       // create a function block
     llvm::Value *createInstance(shared_ptr<Call<Object>> expr, const std::string &varName);             // create instance
     llvm::Value *mallocInstance(llvm::StructType *cls, const std::string &name);                        // allocate an object of a given class on the heap
-    llvm::Value *createList(shared_ptr<List<Object>> expr, int size);                                   // create a list
+    llvm::Value *createList(shared_ptr<List<Object>> expr, string elemType);                            // create a list
 
     // extract type
     llvm::Type *excrateVarType(std::shared_ptr<Expr<Object>> expr);// extract type from expression
-    llvm::Type *excrateVarType(const string &typeName);            // extract type from string
+    llvm::Type *excrateTypeByName(const string &typeName);         // extract type from string
     llvm::FunctionType *excrateFunType(shared_ptr<Function> stmt); // extract function type
     size_t getTypeSize(llvm::Type *type);
     llvm::StructType *getClassByName(const std::string &name);// get class by name

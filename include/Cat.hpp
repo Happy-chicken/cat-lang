@@ -88,6 +88,6 @@ std::string Cat::readFile(std::string_view filename) {
 
 
 void Cat::buildFile(string path) {
-    std::string source = "{" + readFile(path) + "}";
+    std::string source = "{\n" + readFile(path) + "\n}";
     build(source);
 }

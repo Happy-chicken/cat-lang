@@ -74,6 +74,7 @@ var c:bool=true;
 print("%d\n", a);
 print("%s\n", b);
 print("%d\n", c);
-var d:list = [1, 2+2, 3];
-var e:int = d[1];
-print("%d\n", e);
+
+var f:list<str> = ["a", "b", "c"];
+var g:str = f[1];
+print("%s\n", g);

@@ -174,7 +174,7 @@ llvm::Type *IRGenerator::excrateVarType(std::shared_ptr<Expr<Object>> expr) {
     return builder->getInt32Ty();
 }
 
-llvm::Type *IRGenerator::excrateVarType(const string &typeName) {
+llvm::Type *IRGenerator::excrateTypeByName(const string &typeName) {
 
     if (typeName == "int") {
         return builder->getInt32Ty();
@@ -186,7 +186,8 @@ llvm::Type *IRGenerator::excrateVarType(const string &typeName) {
         return builder->getDoubleTy();
     }
     // TODO
-    else if (typeName == "list") {
+    // if var type's prefix is 'list'
+    else if (typeName.find("list") == 0) {
         return builder->getInt32Ty()->getPointerTo();
     } else if (typeName == "") {
         return builder->getInt32Ty();
@@ -212,8 +213,6 @@ llvm::Value *IRGenerator::createInstance(shared_ptr<Call<Object>> expr, const st
         // Error::ErrorLogMessage() << "[EvaVM]: Undefined class: " << cls;
         Error::addError(expr->paren, "[CyLang]: Undefined class:" + className);
     }
-    // now it is stack allocation, TODO heap allocation
-    // auto instance = varName.empty() ? builder->CreateAlloca(cls) : builder->CreateAlloca(cls, 0, varName);
     auto instance = mallocInstance(cls, varName);
 
     // call constructor
@@ -249,10 +248,13 @@ llvm::Value *IRGenerator::mallocInstance(llvm::StructType *cls, const std::strin
     return instance;
 }
 
-llvm::Value *IRGenerator::createList(shared_ptr<List<Object>> expr, int size) {
+llvm::Value *IRGenerator::createList(shared_ptr<List<Object>> expr, string elemType = "int") {
     auto listSize = expr->items.size();
     // suppose list element type is int
-    auto listType = llvm::ArrayType::get(builder->getInt32Ty(), listSize);
+    // check element type
+    llvm::Type *elementType = excrateTypeByName(elemType);
+
+    auto listType = llvm::ArrayType::get(elementType, listSize);
     auto list = builder->CreateAlloca(listType, 0, "list");
 
     for (auto i = 0; i < listSize; i++) {
@@ -294,7 +296,7 @@ void IRGenerator::buildClassInfo(llvm::StructType *cls, const Class &stmt, Env e
         } else if (mem_met->type == StmtType::Var) {
             auto member = std::dynamic_pointer_cast<Var>(mem_met);
             auto fieldName = member->name.lexeme;
-            auto fieldType = excrateVarType(member->typeName);
+            auto fieldType = excrateTypeByName(member->typeName);
 
             classInfo->fieldsMap[fieldName] = fieldType;
         }
@@ -359,11 +361,11 @@ size_t IRGenerator::getMethodIndex(llvm::StructType *cls, const std::string &met
 llvm::FunctionType *IRGenerator::excrateFunType(shared_ptr<Function> stmt) {
     auto params = stmt->params;
     auto returnType = stmt->returnTypeName.type == NONE ? builder->getInt32Ty()
-                                                        : excrateVarType(stmt->returnTypeName.lexeme);
+                                                        : excrateTypeByName(stmt->returnTypeName.lexeme);
     // auto returnType = builder->getInt32Ty();
     std::vector<llvm::Type *> paramTypes{};
     for (auto &param: params) {
-        auto paramType = excrateVarType(param.second);
+        auto paramType = excrateTypeByName(param.second);
         // auto paramType = builder->getInt32Ty();
         auto paramName = param.first.lexeme;
         paramTypes.push_back(paramName == "self" ? (llvm::Type *) cls->getPointerTo() : paramType);
@@ -550,7 +552,7 @@ Object IRGenerator::visitLogicalExpr(shared_ptr<Logical<Object>> expr) {
 // }
 
 Object IRGenerator::visitListExpr(shared_ptr<List<Object>> expr) {
-    auto list = createList(expr, expr->items.size());
+    auto list = createList(expr);
     return Object::make_llvmval_obj(list);
 }
 
@@ -560,6 +562,7 @@ Object IRGenerator::visitSubscriptExpr(shared_ptr<Subscript<Object>> expr) {
     auto index = evaluate(expr->index);
     auto elementTy = list->getType()->getContainedType(0);
     // auto elementTy = builder->getInt32Ty();
+    // auto elementTy = builder->getInt8PtrTy();
     auto ptr = builder->CreateInBoundsGEP(elementTy, list, {builder->getInt32(0), index});
     lastValue = builder->CreateLoad(elementTy, ptr);
     return Object::make_llvmval_obj(lastValue);
@@ -754,13 +757,16 @@ void IRGenerator::visitVarStmt(const Var &stmt) {
             Values.push_back(lastValue);
             return;
         } else if (stmt.initializer->type == ExprType::List) {
-            auto list = createList(std::dynamic_pointer_cast<List<Object>>(stmt.initializer), 0);
+            std::regex pattern(R"(<(.*?)>)");
+            std::smatch match;
+            std::regex_search(stmt.typeName, match, pattern);
+            auto list = createList(std::dynamic_pointer_cast<List<Object>>(stmt.initializer), match[1]);
             lastValue = environment->define(varName, list);
             Values.push_back(lastValue);
             return;
         }
         auto init = evaluate(stmt.initializer);
-        auto varTy = excrateVarType(stmt.typeName);
+        auto varTy = excrateTypeByName(stmt.typeName);
         auto varBinding = allocVar(varName, varTy, environment);
         lastValue = builder->CreateStore(init, varBinding);
         Values.push_back(lastValue);

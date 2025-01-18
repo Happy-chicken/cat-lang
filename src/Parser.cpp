@@ -63,6 +63,15 @@ shared_ptr<Stmt> Parser::varDeclaration() {
     string typeName{""};
     if (match({INT, FLOAT, BOOL, STR, LIST, IDENTIFIER})) {
         typeName = previous().lexeme;
+        if (previous().type == LIST) {
+            consume(LESS, "[Cat-Lang] Expect '<' after list.");
+            if (match({INT, FLOAT, BOOL, STR, IDENTIFIER})) {
+                typeName += "<" + previous().lexeme + ">";
+                consume(GREATER, "[Cat-Lang] Expect '>' after list.");
+            } else {
+                error(peek(), "[Cat-Lang] Expect list element type.");
+            }
+        }
     } else {
         error(peek(), "[Cat-Lang] Expect variable type.");
     }
@@ -100,12 +109,18 @@ shared_ptr<Function> Parser::function(string kind) {
             consume(COLON, "[Cat-Lang] Except : after parameter.");
             if (match({INT, FLOAT, BOOL, STR, LIST, IDENTIFIER})) {
                 typeName = previous().lexeme;
+                if (previous().type == LIST) {
+                    consume(LESS, "[Cat-Lang] Expect '<' after list.");
+                    if (match({INT, FLOAT, BOOL, STR, IDENTIFIER})) {
+                        typeName += "<" + previous().lexeme + ">";
+                        consume(GREATER, "[Cat-Lang] Expect '>' after list.");
+                    } else {
+                        error(peek(), "[Cat-Lang] Expect list element type.");
+                    }
+                }
             } else {
                 error(peek(), "[Cat-Lang] Expect parameter type.");
             }
-            // if (match({COLON})) {
-            //     typeName = consume(IDENTIFIER, "[Cat-Lang] Expect parameter type.").lexeme;
-            // }
             parameters.emplace_back(name, typeName);
         } while (match({COMMA}));
     }
@@ -115,6 +130,15 @@ shared_ptr<Function> Parser::function(string kind) {
     if (match({ARROW})) {
         if (match({INT, FLOAT, BOOL, STR, LIST, IDENTIFIER})) {
             returnType = previous();
+            if (previous().type == LIST) {
+                consume(LESS, "[Cat-Lang] Expect '<' after list.");
+                if (match({INT, FLOAT, BOOL, STR, IDENTIFIER})) {
+                    returnType.lexeme += "<" + previous().lexeme + ">";
+                    consume(GREATER, "[Cat-Lang] Expect '>' after list.");
+                } else {
+                    error(peek(), "[Cat-Lang] Expect list element type.");
+                }
+            }
         } else {
             Error::addWarn(peek(), "[Cat-Lang] Expect function return value type.");
         }
@@ -257,7 +281,6 @@ shared_ptr<Stmt> Parser::ifStatement() {
 
 /// @brief parse a print statement, like print(...)
 /// @return
-// TODO
 shared_ptr<Stmt> Parser::printStatement() {
     // ! deperate usage, this didn't view print as a function
     // shared_ptr<Expr<Object>> value = expression();

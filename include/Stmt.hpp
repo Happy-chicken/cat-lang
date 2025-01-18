@@ -10,8 +10,6 @@
 #include <utility>
 #include <vector>
 
-using std::cout;
-using std::endl;
 using std::shared_ptr;
 using std::string;
 using std::vector;
