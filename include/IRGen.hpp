@@ -1,7 +1,11 @@
+#ifndef IRGEN_HPP
+#define IRGEN_HPP
+
 #include "./Environment.hpp"
 #include "./Expr.hpp"
 #include "./Stmt.hpp"
 #include "llvm/IR/Constants.h"
+#include <llvm-14/llvm/IR/LLVMContext.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/IRBuilderFolder.h>
@@ -133,6 +137,16 @@ private:
     void visitBreakStmt(const Break &stmt);
     void visitContinueStmt(const Continue &stmt);
 
+public:
+    // get functions to return private members
+    std::unique_ptr<llvm::Module> getModule() {
+        return std::move(module);
+    }
+
+    std::unique_ptr<llvm::LLVMContext> getContext() {
+        return std::move(ctx);
+    }
+
 private:
     static llvm::Value *lastValue;                 // last value generated
     std::vector<llvm::Value *> Values;             // all IR values
@@ -149,3 +163,4 @@ private:
     // optimization
     std::unique_ptr<llvm::legacy::FunctionPassManager> fpm;// function pass manager
 };
+#endif

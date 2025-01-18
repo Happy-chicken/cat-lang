@@ -1,4 +1,7 @@
+#pragma once
+
 #include "IRGen.hpp"
+#include "JIT.hpp"
 #include "Logger.hpp"
 #include "Parser.hpp"
 #include "Resolver.hpp"
@@ -16,12 +19,13 @@ class Cat {
 public:
     Cat() = default;
     ~Cat() = default;
-    static void build(const std::string &program);
-    static void buildFile(std::string path);
-    static std::string readFile(std::string_view filename);
+    void build(const std::string &program);
+    void buildFile(std::string path);
+    std::string readFile(std::string_view filename);
 
 public:
     static std::string logo;
+    bool isJIT = false;
 };
 
 std::string Cat::logo{R"(
@@ -43,11 +47,11 @@ ________________________________________
 
 void Cat::build(const string &program) {
     // lexer analysis
-    auto scanner = std::make_shared<Scanner>(program);
+    auto scanner = std::make_unique<Scanner>(program);
     auto tokens = scanner->scanTokens();
     // ---------------------------------------------------------------------------
     // syntax analysis
-    auto parser = std::make_shared<Parser>(tokens);
+    auto parser = std::make_unique<Parser>(tokens);
     auto statements = parser->parse();
     if (Error::hadError) {
         Error::report();
@@ -68,6 +72,28 @@ void Cat::build(const string &program) {
     // ---------------------------------------------------------------------------
     if (Error::hadError) {
         Error::report();
+    }
+    // ---------------------------------------------------------------------------
+    // JIT
+    if (isJIT) {
+
+        typedef int (*AddFunctionType)(int, int);
+        // JIT
+        llvm::ExitOnError ExitOnErr;
+        JIT catJIT{ir_generator};
+        catJIT.createJIT();
+
+        auto jit = catJIT.getJIT();
+
+        auto module = catJIT.CreateModule();
+        ExitOnErr(jit->addIRModule(std::move(module)));
+        auto functionSymbol = ExitOnErr(jit->lookup("add"));
+        AddFunctionType add = (AddFunctionType) functionSymbol.getAddress();
+
+        // Use the "Add()" function
+        int result = add(12, 34);
+        std::cout << "\n-----------------\n";
+        std::cout << "Add(12, 34) = " << result << std::endl;
     }
 }
 
