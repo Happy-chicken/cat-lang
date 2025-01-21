@@ -1,6 +1,6 @@
 
 cmake --build ./build;
-./build/CatLang ./testjit.cat;
+./build/CatLang ./test/testjit.cat;
 # lli 
-clang++ -O0 -I/usr/include/gc ./output.ll /usr/lib/x86_64-linux-gnu/libgc.a -o catlang;
+clang++-14 -O3 -I/usr/include/gc ./output.ll /usr/lib/x86_64-linux-gnu/libgc.a -o catlang;
 ./catlang;

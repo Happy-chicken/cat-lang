@@ -5,7 +5,7 @@
 int main(int argc, char *argv[]) {
     std::string filePath;// = "./test.cat";
     Cat cat;
-    cat.isJIT = true;
+    cat.isJIT = false;
     if (argc > 1) {
         filePath = argv[1];
         // ---------------------------------------------------------------------------

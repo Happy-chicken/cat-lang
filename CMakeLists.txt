@@ -3,7 +3,8 @@ cmake_minimum_required(VERSION 3.10)
 # Set the project name
 project(CatLang)
 
-set(LLVM_DIR "/usr/lib/llvm-14/cmake")
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find LLVM package
 find_package(LLVM REQUIRED CONFIG)
@@ -11,8 +12,10 @@ find_package(LLVM REQUIRED CONFIG)
 #Find the libgc
 find_library(GC_LIB gc REQUIRED)
 
-# Set the compiler to clang++-17
-set(CMAKE_CXX_COMPILER "/usr/local/bin/clang++-17")
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Set the compiler to clang++-14
+set(CMAKE_CXX_COMPILER "/usr/bin/clang++-14")
 
 # add include directories
 include_directories(/usr/include/gc)

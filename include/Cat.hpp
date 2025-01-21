@@ -1,7 +1,7 @@
 #pragma once
 
 #include "IRGen.hpp"
-#include "JIT.hpp"
+// #include "JIT.hpp"
 #include "Logger.hpp"
 #include "Parser.hpp"
 #include "Resolver.hpp"
@@ -75,26 +75,26 @@ void Cat::build(const string &program) {
     }
     // ---------------------------------------------------------------------------
     // JIT
-    if (isJIT) {
+    // if (isJIT) {
 
-        typedef int (*AddFunctionType)(int, int);
-        // JIT
-        llvm::ExitOnError ExitOnErr;
-        JIT catJIT{ir_generator};
-        catJIT.createJIT();
+    //     typedef int (*AddFunctionType)(int, int);
+    //     // JIT
+    //     llvm::ExitOnError ExitOnErr;
+    //     JIT catJIT{ir_generator};
+    //     catJIT.createJIT();
+    //     // TODO
+    //     auto jit = catJIT.getJIT();
 
-        auto jit = catJIT.getJIT();
+    //     auto module = catJIT.CreateModule();
+    //     ExitOnErr(jit->addIRModule(std::move(module)));
+    //     auto functionSymbol = ExitOnErr(jit->lookup("add"));
+    //     AddFunctionType add = (AddFunctionType) functionSymbol.getAddress();
 
-        auto module = catJIT.CreateModule();
-        ExitOnErr(jit->addIRModule(std::move(module)));
-        auto functionSymbol = ExitOnErr(jit->lookup("add"));
-        AddFunctionType add = (AddFunctionType) functionSymbol.getAddress();
-
-        // Use the "Add()" function
-        int result = add(12, 34);
-        std::cout << "\n-----------------\n";
-        std::cout << "Add(12, 34) = " << result << std::endl;
-    }
+    //     // Use the "Add()" function
+    //     int result = add(12, 34);
+    //     std::cout << "\n-----------------\n";
+    //     std::cout << "Add(12, 34) = " << result << std::endl;
+    // }
 }
 
 std::string Cat::readFile(std::string_view filename) {
@@ -114,6 +114,6 @@ std::string Cat::readFile(std::string_view filename) {
 
 
 void Cat::buildFile(string path) {
-    std::string source = "{\n" + readFile(path) + "\n}";
+    std::string source = "{" + readFile(path) + "\n}";
     build(source);
 }

@@ -45,10 +45,10 @@ class Transformer {
 var t : Transformer = Transformer(5);
 //print("t(10) = %d\n", t(10));
 
-def check(p:Point) -> int {
-    p.f(1);
-    return 0;
-}
+//def check(p:Point) -> int {
+//    p.f(1);
+//    return 0;
+//}
 
 var p1: Point = Point(10, 20);
 var p2: Point3D = Point3D(10, 20, 30);

@@ -1,16 +1,16 @@
 // HelloJIT.cpp
 
-#include "llvm/ExecutionEngine/Orc/LLJIT.h"
-#include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm-14/llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm-14/llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
+#include "llvm-14/llvm/IR/BasicBlock.h"
+#include "llvm-14/llvm/IR/Function.h"
+#include "llvm-14/llvm/IR/IRBuilder.h"
+#include "llvm-14/llvm/IR/LLVMContext.h"
+#include "llvm-14/llvm/IR/Module.h"
+#include "llvm-14/llvm/IR/Verifier.h"
+#include "llvm-14/llvm/Support/InitLLVM.h"
+#include "llvm-14/llvm/Support/TargetSelect.h"
+#include "llvm-14/llvm/Support/raw_ostream.h"
 
 #include <iostream>
 #include <utility>

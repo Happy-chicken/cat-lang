@@ -64,7 +64,7 @@ llvm::Value *IRGenerator::gen(vector<shared_ptr<Stmt>> &statements) {
 
 void IRGenerator::moduleInit() {
     ctx = std::make_unique<llvm::LLVMContext>();
-    module = std::make_unique<llvm::Module>("Cy-lang", *ctx);
+    module = std::make_unique<llvm::Module>("Cat-lang", *ctx);
     builder = std::make_unique<llvm::IRBuilder<>>(*ctx);
     varsBuilder = std::make_unique<llvm::IRBuilder<>>(*ctx);
     // optimization
@@ -150,7 +150,7 @@ void IRGenerator::setupGlobalEnvironment() {
 }
 
 void IRGenerator::setupTargetTriple() {
-    module->setTargetTriple("x86_64-unknown-linux-gnu");
+    module->setTargetTriple("x86_64-pc-linux-gnu");
 }
 
 llvm::Type *IRGenerator::excrateVarType(std::shared_ptr<Expr<Object>> expr) {
@@ -195,7 +195,7 @@ llvm::Type *IRGenerator::excrateTypeByName(const string &typeName) {
     return classMap_[typeName].cls->getPointerTo();
 }
 
-// realted to class helper function
+// related to class helper function
 llvm::StructType *IRGenerator::getClassByName(const std::string &name) {
     return llvm::StructType::getTypeByName(*ctx, name);
 }
@@ -561,8 +561,6 @@ Object IRGenerator::visitSubscriptExpr(shared_ptr<Subscript<Object>> expr) {
     auto list = environment->lookup(listName);
     auto index = evaluate(expr->index);
     auto elementTy = list->getType()->getContainedType(0);
-    // auto elementTy = builder->getInt32Ty();
-    // auto elementTy = builder->getInt8PtrTy();
     auto ptr = builder->CreateInBoundsGEP(elementTy, list, {builder->getInt32(0), index});
     lastValue = builder->CreateLoad(elementTy, ptr);
     return Object::make_llvmval_obj(lastValue);
@@ -570,6 +568,8 @@ Object IRGenerator::visitSubscriptExpr(shared_ptr<Subscript<Object>> expr) {
 
 Object IRGenerator::visitCallExpr(shared_ptr<Call<Object>> expr) {
     auto callee = evaluate(expr->callee);
+
+    std::vector<llvm::Value *> args{};
 
     // check if the callee is the method
     if (auto loadedMethod = llvm::dyn_cast<llvm::LoadInst>(callee)) {
@@ -580,7 +580,9 @@ Object IRGenerator::visitCallExpr(shared_ptr<Call<Object>> expr) {
         std::vector<llvm::Value *> args{};
         // by default, the first argument is the instance
         if (expr->arguments.empty() || !isInstanceArgument(expr->arguments[0])) {
-            args.push_back(callee);
+            llvm::Type *targetType = fnType->getParamType(0);
+            auto bitCastArgVal = builder->CreateBitCast(callee, targetType);
+            args.push_back(bitCastArgVal);
         }
 
         for (int i = 0; i < expr->arguments.size(); i++) {
@@ -653,29 +655,7 @@ Object IRGenerator::visitGetExpr(shared_ptr<Get<Object>> expr) {
         auto methodValue = builder->CreateLoad(methodType, methodAddr, "method");
 
         return Object::make_llvmval_obj(methodValue);
-    }
-
-    // else if (isParentMethod(cls, fieldName)) { // static call like Point::distance?
-    //     llvm::Value *vTable = nullptr;
-    //     llvm::StructType *vTableType = nullptr;
-
-    //     // Access the parent vtable
-    //     string className = cls->getName().data();
-    //     cls = classMap_[className].parent;
-    //     auto parentName = std::string(cls->getName().data());
-
-    //     vTable = module->getNamedGlobal(parentName + "_vTable");
-    //     vTableType = llvm::StructType::getTypeByName(*ctx, parentName + "_vTable");
-    //     auto methodIdx = getMethodIndex(vTableType, fieldName);
-    //     auto methodType = (llvm::FunctionType *) vTableType->getElementType(methodIdx);
-
-    //     auto methodAddr = builder->CreateStructGEP(vTableType, vTable, methodIdx, "method_ptr");
-    //     auto methodValue = builder->CreateLoad(methodType, methodAddr, "method");
-
-    //     return Object::make_llvmval_obj(methodValue);
-
-    // }
-    else {// function
+    } else {// function
         auto ptrName = std::string("p") + fieldName;
         auto fieldIdx = getFieldIndex(cls, fieldName);
         auto address = builder->CreateStructGEP(cls, instance, fieldIdx, ptrName);
@@ -740,6 +720,7 @@ void IRGenerator::visitPrintStmt(const Print &stmt) {
 void IRGenerator::visitVarStmt(const Var &stmt) {
     // special case for class fields,
     // which are already defined in class info allocation
+    // this case is for defining variables in class
     if (cls != nullptr) {
         lastValue = builder->getInt32(0);
         return;
@@ -749,8 +730,13 @@ void IRGenerator::visitVarStmt(const Var &stmt) {
 
         // we need to check if the variable is a class
         // so that we can allocate the memory for it i.e. define it in the environment
-        if (stmt.initializer->type == ExprType::Call) {
+        // ! error
+        if (stmt.initializer->type == ExprType::Call &&
+            std::dynamic_pointer_cast<Call<Object>>(stmt.initializer)->callee->type == ExprType::Variable &&
+            getClassByName(std::dynamic_pointer_cast<Variable<Object>>(std::dynamic_pointer_cast<Call<Object>>(stmt.initializer)->callee)->name.lexeme) != nullptr) {
+
             auto call = std::dynamic_pointer_cast<Call<Object>>(stmt.initializer);
+            auto className = std::dynamic_pointer_cast<Variable<Object>>(call->callee)->name.lexeme;
             auto instance = createInstance(call, varName);
             lastValue = environment->define(varName, instance);
             // evaluate(stmt.initializer);

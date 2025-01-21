@@ -1,0 +1,13 @@
+class A {
+    init(self, a:int)->int{
+        return 0;
+    }
+    f(self, a:int)->int{
+        return a;
+    }
+
+}
+
+var a: A=A(1);
+var b:int=a.f(2);
+print("%d",b);

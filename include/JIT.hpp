@@ -1,12 +1,11 @@
 #include "./IRGen.hpp"
-#include "llvm/ExecutionEngine/Orc/LLJIT.h"
-#include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/raw_ostream.h"
-
 #include <iostream>
+#include <llvm-14/llvm/ExecutionEngine/Orc/LLJIT.h>
+#include <llvm-14/llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
 #include <llvm-14/llvm/Support/Error.h>
+#include <llvm-14/llvm/Support/InitLLVM.h>
+#include <llvm-14/llvm/Support/TargetSelect.h>
+#include <llvm-14/llvm/Support/raw_ostream.h>
 #include <memory>
 #include <utility>
 #include <vector>
