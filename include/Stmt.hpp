@@ -81,8 +81,8 @@ public:
         visitor->visitVarStmt(*this);
     }
     shared_ptr<Expr<Object>> initializer;
-    Token name;
-    string typeName;
+    Token name;     // variable name
+    string typeName;// variable type name
 };
 
 class Block : public Stmt {

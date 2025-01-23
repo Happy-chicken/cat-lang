@@ -61,11 +61,11 @@ shared_ptr<Stmt> Parser::varDeclaration() {
     Token identifier = consume(IDENTIFIER, "[Cat-Lang] Expect variable.");
     Token colon = consume(COLON, "[Cat-Lang] Expect ':' after variable.");
     string typeName{""};
-    if (match({INT, FLOAT, BOOL, STR, LIST, IDENTIFIER})) {
+    if (match({INT, DOUBLE, BOOL, STR, LIST, IDENTIFIER})) {
         typeName = previous().lexeme;
         if (previous().type == LIST) {
             consume(LESS, "[Cat-Lang] Expect '<' after list.");
-            if (match({INT, FLOAT, BOOL, STR, IDENTIFIER})) {
+            if (match({INT, DOUBLE, BOOL, STR, IDENTIFIER})) {
                 typeName += "<" + previous().lexeme + ">";
                 consume(GREATER, "[Cat-Lang] Expect '>' after list.");
             } else {
@@ -107,11 +107,11 @@ shared_ptr<Function> Parser::function(string kind) {
             Token name = consume(IDENTIFIER, "[Cat-Lang] Expect non-keyword parameter.");
             string typeName("");
             consume(COLON, "[Cat-Lang] Except : after parameter.");
-            if (match({INT, FLOAT, BOOL, STR, LIST, IDENTIFIER})) {
+            if (match({INT, DOUBLE, BOOL, STR, LIST, IDENTIFIER})) {
                 typeName = previous().lexeme;
                 if (previous().type == LIST) {
                     consume(LESS, "[Cat-Lang] Expect '<' after list.");
-                    if (match({INT, FLOAT, BOOL, STR, IDENTIFIER})) {
+                    if (match({INT, DOUBLE, BOOL, STR, IDENTIFIER})) {
                         typeName += "<" + previous().lexeme + ">";
                         consume(GREATER, "[Cat-Lang] Expect '>' after list.");
                     } else {
@@ -128,11 +128,11 @@ shared_ptr<Function> Parser::function(string kind) {
 
     Token returnType;
     if (match({ARROW})) {
-        if (match({INT, FLOAT, BOOL, STR, LIST, IDENTIFIER})) {
+        if (match({INT, DOUBLE, BOOL, STR, LIST, IDENTIFIER})) {
             returnType = previous();
             if (previous().type == LIST) {
                 consume(LESS, "[Cat-Lang] Expect '<' after list.");
-                if (match({INT, FLOAT, BOOL, STR, IDENTIFIER})) {
+                if (match({INT, DOUBLE, BOOL, STR, IDENTIFIER})) {
                     returnType.lexeme += "<" + previous().lexeme + ">";
                     consume(GREATER, "[Cat-Lang] Expect '>' after list.");
                 } else {

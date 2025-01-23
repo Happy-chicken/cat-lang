@@ -3,6 +3,7 @@
 #include "../include/Logger.hpp"
 #include "../include/Stmt.hpp"
 #include "../include/Token.hpp"
+#include "Object.hpp"
 #include <llvm-14/llvm/IR/Constant.h>
 #include <llvm-14/llvm/IR/Constants.h>
 #include <llvm-14/llvm/IR/DerivedTypes.h>
@@ -22,6 +23,7 @@
 #include <llvm-14/llvm/Transforms/Scalar/GVN.h>
 #include <memory>
 #include <regex>
+#include <stdexcept>
 #include <string>
 
 llvm::Value *IRGenerator::lastValue = nullptr;
@@ -103,6 +105,7 @@ llvm::Function *IRGenerator::createFunctionProto(const std::string &fnName, llvm
 
 llvm::Value *IRGenerator::allocVar(const std::string &name, llvm::Type *type, Env env) {
     varsBuilder->SetInsertPoint(&fn->getEntryBlock());
+
     auto varAlloc = varsBuilder->CreateAlloca(type, 0, name.c_str());
 
     env->define(name, varAlloc);
@@ -159,7 +162,7 @@ llvm::Type *IRGenerator::excrateVarType(std::shared_ptr<Expr<Object>> expr) {
         switch (literal->value.data.index()) {
             case 0:
                 // string type
-                return builder->getInt8PtrTy()->getPointerTo();
+                return builder->getInt8PtrTy();
             case 1:
                 // int type
                 return builder->getInt32Ty();
@@ -174,25 +177,29 @@ llvm::Type *IRGenerator::excrateVarType(std::shared_ptr<Expr<Object>> expr) {
     return builder->getInt32Ty();
 }
 
-llvm::Type *IRGenerator::excrateTypeByName(const string &typeName) {
+llvm::Type *IRGenerator::excrateTypeByName(const string &typeName, const Token tok) {
 
     if (typeName == "int") {
         return builder->getInt32Ty();
     } else if (typeName == "str") {
-        return builder->getInt8PtrTy()->getPointerTo();
+        return builder->getInt8PtrTy();//i8**
     } else if (typeName == "bool") {
         return builder->getInt1Ty();
-    } else if (typeName == "float") {
+    } else if (typeName == "double") {
         return builder->getDoubleTy();
     }
-    // TODO
     // if var type's prefix is 'list'
     else if (typeName.find("list") == 0) {
         return builder->getInt32Ty()->getPointerTo();
     } else if (typeName == "") {
         return builder->getInt32Ty();
     }
-    return classMap_[typeName].cls->getPointerTo();
+    auto varTy = classMap_[typeName].cls;
+    if (varTy == nullptr) {
+        Error::addError(tok, "[CyLang]: Undefined type: " + typeName);
+        throw std::runtime_error("Undefined type");
+    }
+    return varTy->getPointerTo();
 }
 
 // related to class helper function
@@ -212,6 +219,7 @@ llvm::Value *IRGenerator::createInstance(shared_ptr<Call<Object>> expr, const st
     if (cls == nullptr) {
         // Error::ErrorLogMessage() << "[EvaVM]: Undefined class: " << cls;
         Error::addError(expr->paren, "[CyLang]: Undefined class:" + className);
+        throw std::runtime_error("Undefined class");
     }
     auto instance = mallocInstance(cls, varName);
 
@@ -219,7 +227,16 @@ llvm::Value *IRGenerator::createInstance(shared_ptr<Call<Object>> expr, const st
     auto ctor = module->getFunction(className + "_init");
 
     std::vector<llvm::Value *> args{instance};
-
+    // clang-format off
+    // check if the number of arguments is correct
+    if (ctor->arg_size() - 1 != expr->arguments.size()) {
+        Error::addError(expr->paren, "[CyLang]: No matched constructor, expect " + 
+                                    std::to_string(ctor->arg_size() - 1) + 
+                                    " parameters, but got " + 
+                                    std::to_string(expr->arguments.size()));
+        throw std::runtime_error("No matched constructor");
+    }
+    // clang-format on
     for (auto arg: expr->arguments) {
         args.push_back(evaluate(arg));
     }
@@ -252,7 +269,7 @@ llvm::Value *IRGenerator::createList(shared_ptr<List<Object>> expr, string elemT
     auto listSize = expr->items.size();
     // suppose list element type is int
     // check element type
-    llvm::Type *elementType = excrateTypeByName(elemType);
+    llvm::Type *elementType = excrateTypeByName(elemType, expr->opening_bracket);
 
     auto listType = llvm::ArrayType::get(elementType, listSize);
     auto list = builder->CreateAlloca(listType, 0, "list");
@@ -296,7 +313,7 @@ void IRGenerator::buildClassInfo(llvm::StructType *cls, const Class &stmt, Env e
         } else if (mem_met->type == StmtType::Var) {
             auto member = std::dynamic_pointer_cast<Var>(mem_met);
             auto fieldName = member->name.lexeme;
-            auto fieldType = excrateTypeByName(member->typeName);
+            auto fieldType = excrateTypeByName(member->typeName, stmt.name);
 
             classInfo->fieldsMap[fieldName] = fieldType;
         }
@@ -361,11 +378,11 @@ size_t IRGenerator::getMethodIndex(llvm::StructType *cls, const std::string &met
 llvm::FunctionType *IRGenerator::excrateFunType(shared_ptr<Function> stmt) {
     auto params = stmt->params;
     auto returnType = stmt->returnTypeName.type == NONE ? builder->getInt32Ty()
-                                                        : excrateTypeByName(stmt->returnTypeName.lexeme);
+                                                        : excrateTypeByName(stmt->returnTypeName.lexeme, stmt->returnTypeName);
     // auto returnType = builder->getInt32Ty();
     std::vector<llvm::Type *> paramTypes{};
     for (auto &param: params) {
-        auto paramType = excrateTypeByName(param.second);
+        auto paramType = excrateTypeByName(param.second, param.first);
         // auto paramType = builder->getInt32Ty();
         auto paramName = param.first.lexeme;
         paramTypes.push_back(paramName == "self" ? (llvm::Type *) cls->getPointerTo() : paramType);
@@ -428,7 +445,7 @@ Object IRGenerator::visitLiteralExpr(shared_ptr<Literal<Object>> expr) {
             // handle the \n
             auto re = std::regex("\\\\n");
             str_data = std::regex_replace(str_data, re, "\n");
-            val = builder->CreateGlobalStringPtr(str_data);
+            val = builder->CreateGlobalStringPtr(str_data);// i8*
             return Object::make_llvmval_obj(val);
         }
         case 1: {
@@ -461,35 +478,92 @@ Object IRGenerator::visitAssignExpr(shared_ptr<Assign<Object>> expr) {
     auto value = evaluate(expr->value);
     // variable
     auto varBinding = this->environment->lookup(name);
-
+    if (!varBinding) {
+        Error::addError(name, "[CyLang]: Undefined variable: " + name.lexeme);
+        throw std::runtime_error("Undefined variable");
+    }
+    if (varBinding->getType() != value->getType()) {
+        Error::addError(name, "[CyLang]: Target type mismatch");
+        throw std::runtime_error("Type mismatch");
+    }
     builder->CreateStore(value, varBinding);
     return Object::make_llvmval_obj(value);
 }
 
 Object IRGenerator::visitBinaryExpr(shared_ptr<Binary<Object>> expr) {
     //llvm to generate IR for binary
+    auto left = evaluate(expr->left);
+    auto leftOperatorType = left->getType();
+    auto right = evaluate(expr->right);
+    auto rightOperatorType = right->getType();
+    // check if the type of left and right are the same
+    if (leftOperatorType != rightOperatorType) {
+        Error::addError(expr->operation, "[CyLang]: Binary operarion types mismatch");
+        throw std::runtime_error("Type mismatch");
+    }
     if (expr->operation.lexeme == "+") {
-        GEN_BINARY_OP(CreateAdd, "tmpadd");
+        // check if operator is int or double
+        if (leftOperatorType->isIntegerTy()) {
+            return Object::make_llvmval_obj(builder->CreateAdd(left, right, "tmpiadd"));
+        } else if (leftOperatorType->isDoubleTy()) {
+            return Object::make_llvmval_obj(builder->CreateFAdd(left, right, "tmpfadd"));
+        }
     } else if (expr->operation.lexeme == "-") {
-        GEN_BINARY_OP(CreateSub, "tmpsub");
+        if (leftOperatorType->isIntegerTy()) {
+            return Object::make_llvmval_obj(builder->CreateSub(left, right, "tmpisub"));
+        } else if (leftOperatorType->isDoubleTy()) {
+            return Object::make_llvmval_obj(builder->CreateFSub(left, right, "tmpfsub"));
+        }
     } else if (expr->operation.lexeme == "*") {
-        GEN_BINARY_OP(CreateMul, "tmpmul");
+        if (leftOperatorType->isIntegerTy()) {
+            return Object::make_llvmval_obj(builder->CreateMul(left, right, "tmpimul"));
+        } else if (leftOperatorType->isDoubleTy()) {
+            return Object::make_llvmval_obj(builder->CreateFMul(left, right, "tmpfmul"));
+        }
     } else if (expr->operation.lexeme == "/") {
-        GEN_BINARY_OP(CreateSDiv, "tmpdiv");
+        if (leftOperatorType->isIntegerTy()) {
+            return Object::make_llvmval_obj(builder->CreateSDiv(left, right, "tmpidiv"));
+        } else if (leftOperatorType->isDoubleTy()) {
+            return Object::make_llvmval_obj(builder->CreateFDiv(left, right, "tmpfdiv"));
+        }
     }
     // Unsigned comparison
     else if (expr->operation.lexeme == ">") {
-        GEN_BINARY_OP(CreateICmpUGT, "tmpcmp");
+        if (leftOperatorType->isIntegerTy()) {
+            return Object::make_llvmval_obj(builder->CreateICmpSGT(left, right, "tmpicmp"));
+        } else if (leftOperatorType->isDoubleTy()) {
+            return Object::make_llvmval_obj(builder->CreateFCmpOGT(left, right, "tmpfcmp"));
+        }
     } else if (expr->operation.lexeme == "<") {
-        GEN_BINARY_OP(CreateICmpULT, "tmpcmp");
+        if (leftOperatorType->isIntegerTy()) {
+            return Object::make_llvmval_obj(builder->CreateICmpSLT(left, right, "tmpicmp"));
+        } else if (leftOperatorType->isDoubleTy()) {
+            return Object::make_llvmval_obj(builder->CreateFCmpOLT(left, right, "tmpfcmp"));
+        }
     } else if (expr->operation.lexeme == "==") {
-        GEN_BINARY_OP(CreateICmpEQ, "tmpcmp");
+        if (leftOperatorType->isIntegerTy()) {
+            return Object::make_llvmval_obj(builder->CreateICmpEQ(left, right, "tmpicmp"));
+        } else if (leftOperatorType->isDoubleTy()) {
+            return Object::make_llvmval_obj(builder->CreateFCmpOEQ(left, right, "tmpfcmp"));
+        }
     } else if (expr->operation.lexeme == "!=") {
-        GEN_BINARY_OP(CreateICmpNE, "tmpcmp");
+        if (leftOperatorType->isIntegerTy()) {
+            return Object::make_llvmval_obj(builder->CreateICmpNE(left, right, "tmpicmp"));
+        } else if (leftOperatorType->isDoubleTy()) {
+            return Object::make_llvmval_obj(builder->CreateFCmpONE(left, right, "tmpfcmp"));
+        }
     } else if (expr->operation.lexeme == ">=") {
-        GEN_BINARY_OP(CreateICmpUGE, "tmpcmp");
+        if (leftOperatorType->isIntegerTy()) {
+            return Object::make_llvmval_obj(builder->CreateICmpSGE(left, right, "tmpicmp"));
+        } else if (leftOperatorType->isDoubleTy()) {
+            return Object::make_llvmval_obj(builder->CreateFCmpOGE(left, right, "tmpfcmp"));
+        }
     } else if (expr->operation.lexeme == "<=") {
-        GEN_BINARY_OP(CreateICmpULE, "tmpcmp");
+        if (leftOperatorType->isIntegerTy()) {
+            return Object::make_llvmval_obj(builder->CreateICmpSLE(left, right, "tmpicmp"));
+        } else if (leftOperatorType->isDoubleTy()) {
+            return Object::make_llvmval_obj(builder->CreateFCmpOLE(left, right, "tmpfcmp"));
+        }
     }
 
     return Object::make_llvmval_obj(builder->getInt32(0));
@@ -558,10 +632,13 @@ Object IRGenerator::visitListExpr(shared_ptr<List<Object>> expr) {
 
 Object IRGenerator::visitSubscriptExpr(shared_ptr<Subscript<Object>> expr) {
     auto listName = expr->identifier.lexeme;
-    auto list = environment->lookup(listName);
+    auto list = environment->lookup(listName);// list<str> = ["s", "t", "r"]=>[size * i8*]*
+    // list->getType()->dump();                  // [3 * i8*]*
     auto index = evaluate(expr->index);
-    auto elementTy = list->getType()->getContainedType(0);
-    auto ptr = builder->CreateInBoundsGEP(elementTy, list, {builder->getInt32(0), index});
+    auto listType = list->getType()->getPointerElementType();
+    auto elementTy = listType->getArrayElementType();
+    // elementTy->dump();// i8*
+    auto ptr = builder->CreateInBoundsGEP(listType, list, {builder->getInt32(0), index});
     lastValue = builder->CreateLoad(elementTy, ptr);
     return Object::make_llvmval_obj(lastValue);
 }
@@ -569,7 +646,6 @@ Object IRGenerator::visitSubscriptExpr(shared_ptr<Subscript<Object>> expr) {
 Object IRGenerator::visitCallExpr(shared_ptr<Call<Object>> expr) {
     auto callee = evaluate(expr->callee);
 
-    std::vector<llvm::Value *> args{};
 
     // check if the callee is the method
     if (auto loadedMethod = llvm::dyn_cast<llvm::LoadInst>(callee)) {
@@ -585,6 +661,15 @@ Object IRGenerator::visitCallExpr(shared_ptr<Call<Object>> expr) {
             args.push_back(bitCastArgVal);
         }
 
+        // check if the number of method arguments is correct
+        // clang-format off
+        if (fnType->getNumParams() - 1 != expr->arguments.size()) {
+            Error::addError(expr->paren, "[CyLang]: No matched method, expect " + 
+                                                        std::to_string(fnType->getNumParams() - 1) +
+                                                        " parameters, but got " + std::to_string(expr->arguments.size()));
+            throw std::runtime_error("No matched method");
+        }
+        // clang-format on
         for (int i = 0; i < expr->arguments.size(); i++) {
             auto argValue = evaluate(expr->arguments[i]);
             // Need to cast parameter type to support polymorphism(sub class)
@@ -605,6 +690,7 @@ Object IRGenerator::visitCallExpr(shared_ptr<Call<Object>> expr) {
         std::vector<llvm::Value *> args{};
         auto argIndex = 0;
         auto calleeType = callee->getType()->getContainedType(0);
+        // if it is closure
         if (calleeType->isStructTy()) {
             auto cls = (llvm::StructType *) calleeType;
             std::string className{cls->getName().data()};
@@ -618,6 +704,17 @@ Object IRGenerator::visitCallExpr(shared_ptr<Call<Object>> expr) {
         }
 
         auto fn = (llvm::Function *) callee;
+
+        // check if the number of arguments is correct
+        // clang-format off
+        if (fn->arg_size()-args.size() != expr->arguments.size()) {
+            Error::addError(expr->paren, "[CyLang]: No matched function, expect " + 
+                                        std::to_string(fn->arg_size()-args.size()) + 
+                                        " parameters, but got " + 
+                                        std::to_string(expr->arguments.size()));
+            throw std::runtime_error("No matched function");
+        }
+        // clang-format on
 
         for (auto arg: expr->arguments) {
             auto argValue = evaluate(arg);
@@ -733,7 +830,10 @@ void IRGenerator::visitVarStmt(const Var &stmt) {
         // ! error
         if (stmt.initializer->type == ExprType::Call &&
             std::dynamic_pointer_cast<Call<Object>>(stmt.initializer)->callee->type == ExprType::Variable &&
-            getClassByName(std::dynamic_pointer_cast<Variable<Object>>(std::dynamic_pointer_cast<Call<Object>>(stmt.initializer)->callee)->name.lexeme) != nullptr) {
+            getClassByName(std::dynamic_pointer_cast<Variable<Object>>(
+                               std::dynamic_pointer_cast<Call<Object>>(stmt.initializer)->callee
+            )
+                               ->name.lexeme) != nullptr) {
 
             auto call = std::dynamic_pointer_cast<Call<Object>>(stmt.initializer);
             auto className = std::dynamic_pointer_cast<Variable<Object>>(call->callee)->name.lexeme;
@@ -752,7 +852,11 @@ void IRGenerator::visitVarStmt(const Var &stmt) {
             return;
         }
         auto init = evaluate(stmt.initializer);
-        auto varTy = excrateTypeByName(stmt.typeName);
+        auto varTy = excrateTypeByName(stmt.typeName, stmt.name);
+        if (varTy != init->getType()) {
+            Error::addError(stmt.name, "[CyLang]: Variable decalaration type mismatch");
+            throw std::runtime_error("Type mismatch");
+        }
         auto varBinding = allocVar(varName, varTy, environment);
         lastValue = builder->CreateStore(init, varBinding);
         Values.push_back(lastValue);
@@ -777,8 +881,6 @@ void IRGenerator::visitClassStmt(const Class &stmt) {
 
     // compile class
     cls = llvm::StructType::create(*ctx, className);
-    //! need to delete
-    // module->getOrInsertGlobal(className, cls);
     // super class data always sit at the beginning
     if (parent != nullptr) {
         inheritClass(cls, parent);

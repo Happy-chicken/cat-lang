@@ -74,7 +74,7 @@ typedef enum {
     CONTINUE,
     // type
     INT,
-    FLOAT,
+    DOUBLE,
     BOOL,
     STR,
     LIST,

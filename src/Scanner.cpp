@@ -37,9 +37,9 @@ const unordered_map<string, TokenType> Scanner::keywords = {
     {"continue", CONTINUE},
 
     {"int", INT},
-    // {"float", FLOAT},
-    // {"bool", BOOL},
-    // {"str", STR},
+    {"double", DOUBLE},
+    {"bool", BOOL},
+    {"str", STR},
     {"list", LIST},
     // TODO
     {"lambda", LAMBDA},

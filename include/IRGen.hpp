@@ -19,6 +19,7 @@
 using Env = std::shared_ptr<Environment>;
 
 // Generic binary operator:
+// left and right should have the same type
 #define GEN_BINARY_OP(Op, varName)                    \
     do {                                              \
         auto left = evaluate(expr->left);             \
@@ -74,18 +75,21 @@ private:
     // create somthing(object)
     llvm::Function *createFunction(const std::string &fnName, llvm::FunctionType *fnType, Env env);     // create a function
     llvm::Function *createFunctionProto(const std::string &fnName, llvm::FunctionType *fnType, Env env);// create a function prototype
-    llvm::Value *allocVar(const std::string &name, llvm::Type *type, Env env);                          // allocate a variable
-    llvm::GlobalVariable *createGlobalVariable(const std::string &name, llvm::Constant *init);          // create a global variable
     llvm::BasicBlock *createBB(const std::string &name, llvm::Function *fn);                            // create a basic block
     void createFunctionBlock(llvm::Function *fn);                                                       // create a function block
-    llvm::Value *createInstance(shared_ptr<Call<Object>> expr, const std::string &varName);             // create instance
-    llvm::Value *mallocInstance(llvm::StructType *cls, const std::string &name);                        // allocate an object of a given class on the heap
-    llvm::Value *createList(shared_ptr<List<Object>> expr, string elemType);                            // create a list
+
+    llvm::Value *allocVar(const std::string &name, llvm::Type *type, Env env);// allocate a variable
+
+    llvm::GlobalVariable *createGlobalVariable(const std::string &name, llvm::Constant *init);// create a global variable
+    llvm::Value *createInstance(shared_ptr<Call<Object>> expr, const std::string &varName);   // create instance
+    llvm::Value *mallocInstance(llvm::StructType *cls, const std::string &name);              // allocate an object of a given class on the heap
+    llvm::Value *createList(shared_ptr<List<Object>> expr, string elemType);                  // create a list
 
     // extract type
-    llvm::Type *excrateVarType(std::shared_ptr<Expr<Object>> expr);// extract type from expression
-    llvm::Type *excrateTypeByName(const string &typeName);         // extract type from string
-    llvm::FunctionType *excrateFunType(shared_ptr<Function> stmt); // extract function type
+    llvm::Type *excrateVarType(std::shared_ptr<Expr<Object>> expr);        // extract type from expression
+    llvm::Type *excrateTypeByName(const string &typeName, const Token tok);// extract type from string
+    llvm::FunctionType *excrateFunType(shared_ptr<Function> stmt);         // extract function type
+
     size_t getTypeSize(llvm::Type *type);
     llvm::StructType *getClassByName(const std::string &name);// get class by name
 
