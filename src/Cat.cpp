@@ -1,4 +1,6 @@
 #include "../include/Cat.hpp"
+#include "Value.hpp"
+#include <memory>
 
 std::string Cat::logo{R"(
 ├─Welcome to Cat Programming Language!─┤
@@ -42,8 +44,10 @@ void Cat::run(const std::string &program) {
     // }
     // ---------------------------------------------------------------------------
     // vm execution
-    CatStackVM vm;
-    vm.run(statements);
+    auto vm = std::make_shared<CatStackVM>();
+
+    auto res = vm->run(statements);
+    std::cout << "Result: " << AS_INT(res) << '\n';
 }
 
 void Cat::build(const string &program) {
@@ -112,6 +116,6 @@ void Cat::buildFile(string path) {
 }
 
 void Cat::runFile(string path) {
-    std::string source = "{" + readFile(path) + "\n}";
+    std::string source = readFile(path);
     run(source);
 }

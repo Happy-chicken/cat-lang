@@ -1,12 +1,12 @@
 #pragma once
+
 #include <llvm-14/llvm/IR/Value.h>
 #include <memory>
 #include <string>
 #include <variant>
-
-// #include <xtree>
-
-using std::shared_ptr;
+namespace CatVM {
+    struct CodeObject;
+}
 using std::string;
 using std::to_string;
 //monostate non-valid state in variant in c++17
@@ -14,7 +14,9 @@ using Objects = std::variant<std::string, int, double, bool, std::monostate>;
 class Object {
 public:
     Objects data;
-    llvm::Value *llvmValue;
+
+    llvm::Value *llvmValue;       // used for llvm value
+    CatVM::CodeObject *catvmValue;// used for vm code object
 
 
 public:
@@ -23,6 +25,13 @@ public:
         obj.llvmValue = llvmValue_;
         return obj;
     }
+
+    static Object make_catvmval_obj(CatVM::CodeObject *catvmValue_) {
+        Object obj;
+        obj.catvmValue = catvmValue_;
+        return obj;
+    }
+
     static Object make_none_obj() {
         Object none_obj;
         none_obj.data = std::monostate{};

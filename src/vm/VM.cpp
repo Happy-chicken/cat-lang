@@ -1,24 +1,68 @@
 #include "VM.hpp"
+#include "Logger.hpp"
 #include "OpCode.hpp"
+#include "Value.hpp"
+#include <ios>
 
-#define READ_BYTE() (*ip++)
-
-void CatStackVM::run(std::vector<std::shared_ptr<Stmt>> &statements) {
-    // run the programe
+CatVM::Value CatStackVM::run(std::vector<std::shared_ptr<Stmt>> &statements) {
     // compile the statements ast into bytecode
-    // code = compiler->compile(statements);
-    // bytecode = {OP_HALT};
-    // set the instruction pointer to the first instruction
-    ip = &bytecode[0];
-
+    codeobj = compiler->compile(statements);
+    // constants.push_back(INT(100));
+    ip = &codeobj->bytecodes[0];
+    sp = &codeobj->constants[0];
     return eval();
 }
 
-void CatStackVM::eval() {
+CatVM::Value CatStackVM::eval() {
     while (true) {
-        switch (READ_BYTE()) {
+        auto opcode = READ_BYTE();
+        switch (opcode) {
             case OP_HALT:
-                return;
+                return pop();
+            case OP_CONST: {
+                // auto constIndex = READ_BYTE();
+                // auto constant = constants[constIndex];
+                push(READ_CONSTANT());
+                break;
+            }
+            // Binary operations
+            case OP_ADD: {
+                BINARY_OP(+);
+                // TODO add string concatenation
+                break;
+            }
+            case OP_SUB: {
+                BINARY_OP(-);
+                break;
+            }
+            case OP_MUL: {
+                BINARY_OP(*);
+                break;
+            }
+            case OP_DIV: {
+                BINARY_OP(/);
+                break;
+            }
+            default:
+                DIE << "Unknown opcode: " << std::hex << opcode;
         }
     }
+}
+
+void CatStackVM::push(const CatVM::Value &value) {
+    // check if the stack is full
+    if ((size_t) (sp - stack.begin()) == STACK_MAX) {
+        DIE << "Stack overflow.\n";
+    }
+    // ? *sp fault address
+    *sp = value;
+    sp++;
+}
+
+CatVM::Value CatStackVM::pop() {
+    if (sp == stack.begin()) {
+        DIE << "Stack is empty!\n";
+    }
+    --sp;
+    return *sp;
 }

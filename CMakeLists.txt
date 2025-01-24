@@ -16,6 +16,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set the compiler to clang++-14
 set(CMAKE_CXX_COMPILER "/usr/bin/clang++-14")
+set(CMAKE_LINKER /usr/bin/ld.lld-14)
 
 # add include directories
 include_directories(/usr/include/gc)
@@ -32,10 +33,10 @@ include_directories("${PROJECT_SOURCE_DIR}/include")
 set(SOURCE_DIR "${PROJECT_SOURCE_DIR}/src")
 
 # Collect all source files
-file(GLOB_RECURSE SOURCES "${SOURCE_DIR}/*.cpp", 
-                          "${SOURCE_DIR}/front-end/*.cpp", 
-                          "${SOURCE_DIR}/mid-end/*.cpp", 
-                          "${SOURCE_DIR}/back-end/*.cpp",
+file(GLOB_RECURSE SOURCES "${SOURCE_DIR}/*.cpp"
+                          "${SOURCE_DIR}/front-end/*.cpp"
+                          "${SOURCE_DIR}/mid-end/*.cpp"
+                          "${SOURCE_DIR}/back-end/*.cpp"
                           "${SOURCE_DIR}/vm/*.cpp")
 
 # Add the executable
@@ -61,3 +62,4 @@ target_link_libraries(CatLang ${LLVM_LIBS})
 target_compile_options(CatLang PRIVATE -fstandalone-debug)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION} at ${LLVM_DIR}")
+message(STATUS "Found SOURCES:  ${SOURCES}")
