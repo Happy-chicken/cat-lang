@@ -25,19 +25,23 @@ std::unique_ptr<llvm::Module> JIT::loadModule() {
 }
 
 llvm::Error JIT::run(std::unique_ptr<llvm::Module> module, std::unique_ptr<llvm::LLVMContext> ctx, int argc, char *argv[]) {
-    auto JIT = llvm::orc::LLJITBuilder().create();
+    // auto JIT = llvm::orc::LLJITBuilder().create();// create LLJIT, llvm<expected> is a pointer
+    auto JIT = CatJIT::Create();
     if (!JIT) {
         return JIT.takeError();
     }
+    // add module to the jit
     if (auto err = (*JIT)->addIRModule(llvm::orc::ThreadSafeModule(std::move(module), std::move(ctx)))) {
         return err;
     }
-    const llvm::DataLayout &DL = (*JIT)->getDataLayout();
-    auto DLSG = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(DL.getGlobalPrefix());
-    if (!DLSG) {
-        return DLSG.takeError();
-    }
-    (*JIT)->getMainJITDylib().addGenerator(std::move(*DLSG));
+    // add dynamic library search resolve symbols from the host process
+    // add the current process's dynamic library search generator to the JIT's main dylib
+    // const llvm::DataLayout &DL = (*JIT)->getDataLayout();
+    // auto DLSG = llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(DL.getGlobalPrefix());
+    // if (!DLSG) {
+    //     return DLSG.takeError();
+    // }
+    // (*JIT)->getMainJITDylib().addGenerator(std::move(*DLSG));
 
     // search main symbol
     auto mainSys = (*JIT)->lookup("main");
