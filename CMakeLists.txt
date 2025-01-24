@@ -35,7 +35,8 @@ set(SOURCE_DIR "${PROJECT_SOURCE_DIR}/src")
 file(GLOB_RECURSE SOURCES "${SOURCE_DIR}/*.cpp", 
                           "${SOURCE_DIR}/front-end/*.cpp", 
                           "${SOURCE_DIR}/mid-end/*.cpp", 
-                          "${SOURCE_DIR}/back-end/*.cpp")
+                          "${SOURCE_DIR}/back-end/*.cpp",
+                          "${SOURCE_DIR}/vm/*.cpp")
 
 # Add the executable
 add_executable(CatLang main.cpp ${SOURCES})

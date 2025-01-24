@@ -20,6 +20,31 @@ ________________________________________
 |______________________________________|
 )"};
 
+void Cat::run(const std::string &program) {
+    // lexer analysis
+    auto scanner = std::make_unique<Scanner>(program);
+    auto tokens = scanner->scanTokens();
+    // ---------------------------------------------------------------------------
+    // syntax analysis
+    auto parser = std::make_unique<Parser>(tokens);
+    auto statements = parser->parse();
+    if (Error::hadError) {
+        Error::report();
+        exit(EXIT_FAILURE);
+    }
+    // ---------------------------------------------------------------------------
+    // semantic analysis
+    // auto resolver = std::make_shared<Resolver>();
+    // resolver->resolve(statements);
+    // if (Error::hadError) {
+    //     Error::report();
+    //     exit(EXIT_FAILURE);
+    // }
+    // ---------------------------------------------------------------------------
+    // vm execution
+    CatStackVM vm;
+    vm.run(statements);
+}
 
 void Cat::build(const string &program) {
     // lexer analysis
@@ -84,4 +109,9 @@ std::string Cat::readFile(std::string_view filename) {
 void Cat::buildFile(string path) {
     std::string source = "{" + readFile(path) + "\n}";
     build(source);
+}
+
+void Cat::runFile(string path) {
+    std::string source = "{" + readFile(path) + "\n}";
+    run(source);
 }

@@ -3,15 +3,18 @@
 #include "./include/Logger.hpp"
 
 int main(int argc, char *argv[]) {
-    std::string filePath;// = "./test.cat";
+    std::string filePath = "/home/buyi/code/cat-lang/test/testjit.cat";
+    std::string mode;
     Cat cat(argc, argv);
     cat.isUseJIT = true;
     if (argc > 1) {
-        filePath = argv[1];
+        mode = argv[1];
+        // filePath = argv[2];
         // ---------------------------------------------------------------------------
         Error::spnitList = Error::split(cat.readFile(filePath));
         // ---------------------------------------------------------------------------
-        cat.buildFile(filePath);
+        if (mode == "run") cat.runFile(filePath);
+        if (mode == "build") cat.buildFile(filePath);
         // ---------------------------------------------------------------------------
     } else {
         std::cout << "\t[usage]: cat <file.cat>" << std::endl;

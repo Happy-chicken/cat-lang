@@ -1,3 +1,2 @@
 
-var b:int = 1;
-print("%f\n", b);
+42;
