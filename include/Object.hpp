@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Value.hpp"
 #include <llvm-14/llvm/IR/Value.h>
 #include <memory>
 #include <string>
@@ -15,8 +16,8 @@ class Object {
 public:
     Objects data;
 
-    llvm::Value *llvmValue;       // used for llvm value
-    CatVM::CodeObject *catvmValue;// used for vm code object
+    llvm::Value *llvmValue;  // used for llvm value
+    CatVM::Value *catvmValue;// used for vm code object
 
 
 public:
@@ -26,7 +27,7 @@ public:
         return obj;
     }
 
-    static Object make_catvmval_obj(CatVM::CodeObject *catvmValue_) {
+    static Object make_catvmval_obj(CatVM::Value *catvmValue_) {
         Object obj;
         obj.catvmValue = catvmValue_;
         return obj;

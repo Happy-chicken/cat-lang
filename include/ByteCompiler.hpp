@@ -32,7 +32,7 @@ private:
     void execute(shared_ptr<Stmt> stmt) {
         stmt->accept(shared_from_this());
     }
-    CatVM::CodeObject *evaluate(shared_ptr<Expr<Object>> expr) {
+    CatVM::Value *evaluate(shared_ptr<Expr<Object>> expr) {
         return expr->accept(shared_from_this()).catvmValue;
     }
 
@@ -43,10 +43,13 @@ private:
     //----------------------------------------------
     // helper function
     // --------------------------------------------
+    size_t ConstIndex(bool value);
     size_t ConstIndex(int value);// get the index of the constant in constants pool
     size_t ConstIndex(double value);
     size_t StringIndex(const string &value);
-
+    //----------------------------------------------
+    // visitor
+    // --------------------------------------------
     // IR generator visitor
     Object visitLiteralExpr(shared_ptr<Literal<Object>> expr);
     Object visitAssignExpr(shared_ptr<Assign<Object>> expr);

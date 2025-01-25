@@ -29,6 +29,7 @@ Object Resolver::visitAssignExpr(shared_ptr<Assign<Object>> expr) {
 }
 
 Object Resolver::visitBinaryExpr(shared_ptr<Binary<Object>> expr) {
+    // check if two operands type are the same
     resolve(expr->left);
     resolve(expr->right);
     return Object::make_none_obj();

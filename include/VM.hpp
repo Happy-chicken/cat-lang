@@ -13,18 +13,34 @@
 // get consant
 #define READ_CONSTANT() (codeobj->constants[READ_BYTE()])
 // calculate the binary operation
-#define BINARY_OP(op)                                                             \
-    do {                                                                          \
-        auto b = pop();                                                           \
-        auto a = pop();                                                           \
-        if (a.type == CatVM::ValueType::INT && b.type == CatVM::ValueType::INT) { \
-            push(INT(AS_INT(a) op AS_INT(b)));                                    \
-        } else {                                                                  \
-            DIE << "Operands must be two integers.\n";                            \
-        }                                                                         \
-    } while (0)
-// max stack size
-#define STACK_MAX 512
+#define BINARY_LOGIC_OP(op)                                                   \
+    do {                                                                      \
+        auto right = pop();                                                   \
+        auto left = pop();                                                    \
+        if (right.type == left.type && left.type == CatVM::ValueType::BOOL) { \
+            push(BOOL(AS_BOOL(left) op AS_BOOL(right)));                      \
+        } else {                                                              \
+            DIE << "[Runtime]: Non-logical operands.";                        \
+        }                                                                     \
+    } while (false)
+
+#define BINARY_NUMERIC_OP(op)                                          \
+    do {                                                               \
+        auto right = pop();                                            \
+        auto left = pop();                                             \
+        if (right.type == left.type) {                                 \
+            switch (right.type) {                                      \
+                case CatVM::ValueType::INT:                            \
+                    push(INT(AS_INT(left) op AS_INT(right)));          \
+                    break;                                             \
+                case CatVM::ValueType::DOUBLE:                         \
+                    push(DOUBLE(AS_DOUBLE(left) op AS_DOUBLE(right))); \
+                default:                                               \
+                    DIE << "[Runtime]: Non-numeric operands.";         \
+            }                                                          \
+        }                                                              \
+    } while (false)
+#define STACK_MAX 512// max stack size
 
 class CatStackVM {
 public:
@@ -37,6 +53,13 @@ public:
     // --------------------------------------------
     void push(const CatVM::Value &value);// push a value onto the stack
     CatVM::Value pop();                  // pop a value from the stack
+
+    void dump() {
+        for (auto &byte: codeobj->bytecodes) {
+            std::cout << (int) byte << " ";
+        }
+        std::cout << std::endl;
+    }
 
 
 private:
