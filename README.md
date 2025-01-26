@@ -1,33 +1,33 @@
 # Welcome to Cat-Lang language
 
 ```
-                                    ________________________________________
-                                    |               |\__/,|   (`\          |
-                                    |             _.|o o  |_   ) )         |
-                                    |-------------(((---(((----------------|        
-                                    |      ___          ___                |       
-                                    |     /  /\        /  /\        ___    |       
-                                    |    /  /:/       /  /::\      /  /\   |       
-                                    |   /  /:/       /  /:/\:\    /  /:/   |       
-                                    |  /  /:/  ___  /  /:/~/::\  /  /:/    |       
-                                    | /__/:/  /  /\/__/:/ /:/\:\/  /::\    |       
-                                    | \  \:\ /  /:/\  \:\/:/__\/__/:/\:\   |       
-                                    |  \  \:\  /:/  \  \::/    \__\/  \:\  |        
-                                    |   \  \:\/:/    \  \:\         \  \:\ |        
-                                    |    \  \::/      \  \:\         \__\/ |       
-                                    |     \__\/        \__\/               |      
-                                    |______________________________________|
+                                                                ________________________________________
+                                                                |               |\__/,|   (`\          |
+                                                                |             _.|o o  |_   ) )         |
+                                                                |-------------(((---(((----------------|        
+                                                                |      ___          ___                |       
+                                                                |     /  /\        /  /\        ___    |       
+                                                                |    /  /:/       /  /::\      /  /\   |       
+                                                                |   /  /:/       /  /:/\:\    /  /:/   |       
+                                                                |  /  /:/  ___  /  /:/~/::\  /  /:/    |       
+                                                                | /__/:/  /  /\/__/:/ /:/\:\/  /::\    |       
+                                                                | \  \:\ /  /:/\  \:\/:/__\/__/:/\:\   |       
+                                                                |  \  \:\  /:/  \  \::/    \__\/  \:\  |        
+                                                                |   \  \:\/:/    \  \:\         \  \:\ |        
+                                                                |    \  \::/      \  \:\         \__\/ |       
+                                                                |     \__\/        \__\/               |      
+                                                                |______________________________________|
 ```
 
 ## Info
-This project integrates JIT compiler using LLVM compiler and VM-based interpreter.
+This project integrates JIT compiler using LLVM and VM-based interpreter.
 
 
 ...
 
 ## syntax
 ### variable
-```language
+```python
 var a:int = 1;
 var a:double = 1.1;
 var:str = "hello, catlang!"
@@ -39,7 +39,7 @@ var:str = "hello, catlang!"
 ```
 
 ### control flow
-```language
+```python
 if (true)
 {
     print("True");
@@ -54,15 +54,15 @@ else
 only support while
 
 developing for loop in python style...
-```language
+```python
 while(cond){
     statement...;
 }
 ```
 
 ### function
-closure?
-```language
+closure? overload?
+```python
 def add(x:int, y:int)->int
 {
     return x+y;
@@ -71,15 +71,21 @@ def add(x:int, y:int)->int
 
 ### list
 nested list? Idk...
-```language
+```python
 var l:list<int> = [1, 2, 3];
+var s:int = l[0];
 ```
 
 ### class
-support "__call__" magic method
+support "__call__" magic method, inheritance and ploymorphism.
 
 more magic methods developping?
-```language
+``` python
+class base
+{
+    init(self){}
+    method(self){}
+}
 class derived < base
 {
     var x:int;
@@ -99,5 +105,17 @@ class derived < base
         return self.x * x;
     }
 }
-````
+var base_class:base = base();
+var derived_class:derived = derived(1, 2);
+base_class.method();
+derived_class.method();
+```
+
+## How to use
+- install cmake, llvm-14, libgc, (ninja)
+- mkdir build && cd build
+- cmake -G (Ninja) ../
+- ninja ./
+- If you set isUseJIT = flase, you need to use clang++ to compile the .ll file to ELF file.
+
 
