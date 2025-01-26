@@ -40,6 +40,36 @@
             }                                                          \
         }                                                              \
     } while (false)
+#define COMPARE_VALUE(op, left, right)                         \
+    do {                                                       \
+        switch (op) {                                          \
+            case 0:                                            \
+                push(BOOL(left == right));                     \
+                break;                                         \
+            case 1:                                            \
+                push(BOOL(left != right));                     \
+                break;                                         \
+            case 2:                                            \
+                push(BOOL(left < right));                      \
+                break;                                         \
+            case 3:                                            \
+                push(BOOL(left <= right));                     \
+                break;                                         \
+            case 4:                                            \
+                push(BOOL(left > right));                      \
+                break;                                         \
+            case 5:                                            \
+                push(BOOL(left >= right));                     \
+                break;                                         \
+            default:                                           \
+                DIE << "[Runtime]: Unknown compare operator."; \
+        }                                                      \
+    } while (false)
+
+#define READ_SHORT() (ip += 2, (uint16_t) ((ip[-2] << 8) | ip[-1]))
+
+#define TO_ADDRESS(offset) (&codeobj->bytecodes[offset])
+
 #define STACK_MAX 512// max stack size
 
 class CatStackVM {

@@ -9,7 +9,14 @@
 #include <memory>
 #include <variant>
 #include <vector>
-
+std::map<std::string, uint8_t> ByteCompiler::compareOpMap = {
+    {"==", 0},
+    {"!=", 1},
+    {"<", 2},
+    {"<=", 3},
+    {">", 4},
+    {">=", 5},
+};
 #define ALLOC_CONST(checker, astype, allocator, value)         \
     do {                                                       \
         for (auto i = 0; i < codeobj->constants.size(); i++) { \
@@ -31,6 +38,15 @@ void ByteCompiler::emit(uint8_t opcode) {
 // --------------------------------------
 // helper function
 // --------------------------------------
+void ByteCompiler::patchJump(size_t offset, uint16_t jumpAddr) {
+    writeByteAtOffset(offset, (jumpAddr >> 8) & 0xff);
+    writeByteAtOffset(offset + 1, jumpAddr & 0xff);
+}
+
+void ByteCompiler::writeByteAtOffset(size_t offset, uint8_t value) {
+    codeobj->bytecodes[offset] = value;
+}
+
 size_t ByteCompiler::ConstIndex(bool value) {
     ALLOC_CONST(IS_BOOL, AS_BOOL, BOOL, value);
     return codeobj->constants.size() - 1;
@@ -89,6 +105,30 @@ Object ByteCompiler::visitBinaryExpr(shared_ptr<Binary<Object>> expr) {
         case TokenType::SLASH:
             emit(OP_DIV);
             break;
+        case TokenType::GREATER:
+            emit(OP_COMPARE);
+            emit(compareOpMap[">"]);
+            break;
+        case TokenType::GREATER_EQUAL:
+            emit(OP_COMPARE);
+            emit(compareOpMap[">="]);
+            break;
+        case TokenType::LESS:
+            emit(OP_COMPARE);
+            emit(compareOpMap["<"]);
+            break;
+        case TokenType::LESS_EQUAL:
+            emit(OP_COMPARE);
+            emit(compareOpMap["<="]);
+            break;
+        case TokenType::BANG_EQUAL:
+            emit(OP_COMPARE);
+            emit(compareOpMap["!="]);
+            break;
+        case TokenType::EQUAL_EQUAL:
+            emit(OP_COMPARE);
+            emit(compareOpMap["=="]);
+            break;
         // TODO: more and more binary operation
         default:
             Error::addError(expr->operation, "[CatVM]: Unknown binary operator.");
@@ -97,6 +137,7 @@ Object ByteCompiler::visitBinaryExpr(shared_ptr<Binary<Object>> expr) {
     return Object::make_none_obj();
 }
 Object ByteCompiler::visitGroupingExpr(shared_ptr<Grouping<Object>> expr) {
+    evaluate(expr->expression);
     return Object::make_none_obj();
 }
 Object ByteCompiler::visitUnaryExpr(shared_ptr<Unary<Object>> expr) {
@@ -174,11 +215,42 @@ void ByteCompiler::visitPrintStmt(const Print &stmt) {
     emit(ConstIndex(int(expr->arguments.size())));
 }
 void ByteCompiler::visitVarStmt(const Var &stmt) { return; }
-void ByteCompiler::visitBlockStmt(const Block &stmt) { return; }
+void ByteCompiler::visitBlockStmt(const Block &stmt) {
+    auto statements = stmt.statements;
+    for (auto &stmt: statements) {
+        execute(stmt);
+    }
+    return;
+}
 void ByteCompiler::visitClassStmt(const Class &stmt) {
     return;
 }
-void ByteCompiler::visitIfStmt(const If &stmt) { return; }
+void ByteCompiler::visitIfStmt(const If &stmt) {
+    auto condition = stmt.main_branch.condition;
+    auto statement = stmt.main_branch.statement;
+    evaluate(condition);
+    emit(OP_JUMP_IF_FALSE);// else branch
+    emit(0);               // backpatch
+    emit(0);
+    auto elseJumpAddr = codeobj->bytecodes.size() - 2;
+    // if condition is true
+    execute(statement);
+    emit(OP_JUMP);
+    emit(0);
+    emit(0);
+    auto endJumpAddr = codeobj->bytecodes.size() - 2;
+
+    // backpatch else branch
+    auto elseBranchAddr = codeobj->bytecodes.size();
+    // patch else jump address
+    patchJump(elseJumpAddr, elseBranchAddr);
+    if (stmt.else_branch != nullptr) {
+        execute(stmt.else_branch);
+    }
+    auto endBranchAddr = codeobj->bytecodes.size();
+    patchJump(endJumpAddr, endBranchAddr);
+    return;
+}
 void ByteCompiler::visitWhileStmt(const While &stmt) { return; }
 void ByteCompiler::visitFunctionStmt(shared_ptr<Function> stmt) { return; }
 void ByteCompiler::visitReturnStmt(const Return &stmt) { return; }

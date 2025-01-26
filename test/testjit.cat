@@ -1,4 +1,9 @@
 
 //print(1, "hello, world");
 //5-1;
-!false;
+if(1==2){
+    print("ture");
+}
+else {
+    print("false");
+}

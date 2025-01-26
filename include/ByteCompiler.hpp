@@ -4,8 +4,9 @@
 #include "Stmt.hpp"
 #include "Value.hpp"
 #include <cstddef>
+#include <cstdint>
 #include <iostream>
-
+#include <map>
 class ByteCompiler : public Visitor<Object>,
                      public Visitor_Stmt,
                      public std::enable_shared_from_this<ByteCompiler> {
@@ -26,6 +27,7 @@ public:
 
 private:
     CatVM::CodeObject *codeobj;
+    static std::map<std::string, uint8_t> compareOpMap;
 
 private:
     // void executeBlock(vector<shared_ptr<Stmt>> statements, Env env);
@@ -43,6 +45,8 @@ private:
     //----------------------------------------------
     // helper function
     // --------------------------------------------
+    void patchJump(size_t offset, uint16_t jumpAddr);
+    void writeByteAtOffset(size_t offset, uint8_t value);
     size_t ConstIndex(bool value);
     size_t ConstIndex(int value);// get the index of the constant in constants pool
     size_t ConstIndex(double value);
