@@ -85,8 +85,22 @@ public:
     CatVM::Value pop();                  // pop a value from the stack
 
     void dump() {
-        for (auto &byte: codeobj->bytecodes) {
-            std::cout << (int) byte << " ";
+        for (auto ip = codeobj->bytecodes.begin(); ip != codeobj->bytecodes.end(); ++ip) {
+            //if it is op_const, print the constant pool index instead of opcode
+            if (*ip == OP_CONST || *ip == OP_PRINT || *ip == OP_COMPARE) {
+                std::cout << instructionMap[*ip] << " "
+                          << (int) *(ip + 1) << " "
+                          << std::endl;
+                ip++;
+            } else if (*ip == OP_JUMP || *ip == OP_JUMP_IF_FALSE) {
+                std::cout << instructionMap[*ip] << " "
+                          << (int) *(ip + 1) << " "
+                          << (int) *(ip + 2) << std::endl;
+                ip += 2;
+
+            } else {
+                std::cout << instructionMap[*ip] << " " << std::endl;
+            }
         }
         std::cout << std::endl;
     }

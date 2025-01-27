@@ -25,6 +25,7 @@ public:
         return codeobj;
     }
 
+
 private:
     CatVM::CodeObject *codeobj;
     static std::map<std::string, uint8_t> compareOpMap;

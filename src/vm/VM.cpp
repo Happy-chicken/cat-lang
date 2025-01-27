@@ -19,7 +19,7 @@ CatVM::Value CatStackVM::eval() {
         switch (opcode) {
             case OP_HALT:
                 return pop();
-                break;
+                // return CatVM::Value();
             case OP_CONST: {
                 push(READ_CONSTANT());
                 break;

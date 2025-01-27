@@ -156,7 +156,7 @@ private:
     std::vector<llvm::Value *> Values;             // all IR values
     Env globalEnv;                                 // global environment
     Env &environment = globalEnv;                  // current env
-    llvm::Function *fn;                            // current compiling function
+    llvm::Function *curFn;                         // current compiling function
     std::unique_ptr<llvm::LLVMContext> ctx;        // container for modules and other LLVM objects
     std::unique_ptr<llvm::Module> module;          // container for functions and global variables
     std::unique_ptr<llvm::IRBuilder<>> varsBuilder;// this builder always prepends to the beginning of the function entry block

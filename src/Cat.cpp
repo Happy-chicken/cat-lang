@@ -47,8 +47,8 @@ void Cat::run(const std::string &program) {
     auto vm = std::make_shared<CatStackVM>();
 
     auto res = vm->run(statements);
-    // vm->dump();
-    std::cout << "Result: " << AS_BOOL(res) << '\n';
+    vm->dump();
+    std::cout << "Result: " << AS_INT(res) << '\n';
 }
 
 void Cat::build(const string &program) {

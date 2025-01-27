@@ -213,6 +213,7 @@ void ByteCompiler::visitPrintStmt(const Print &stmt) {
     }
     emit(OP_PRINT);
     emit(ConstIndex(int(expr->arguments.size())));
+    // emit(OP_RETURN);
 }
 void ByteCompiler::visitVarStmt(const Var &stmt) { return; }
 void ByteCompiler::visitBlockStmt(const Block &stmt) {

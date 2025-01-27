@@ -48,7 +48,7 @@ void IRGenerator::saveModuleToFile(const std::string &fileName) {
 }
 
 void IRGenerator::compile(vector<shared_ptr<Stmt>> &statements) {
-    fn = createFunction("main", llvm::FunctionType::get(builder->getInt32Ty(), false), globalEnv);
+    curFn = createFunction("main", llvm::FunctionType::get(builder->getInt32Ty(), false), globalEnv);
 
     gen(statements);
 
@@ -104,7 +104,12 @@ llvm::Function *IRGenerator::createFunctionProto(const std::string &fnName, llvm
 }
 
 llvm::Value *IRGenerator::allocVar(const std::string &name, llvm::Type *type, Env env) {
-    varsBuilder->SetInsertPoint(&fn->getEntryBlock());
+    // get entry block
+    llvm::BasicBlock &entryBlock = curFn->getEntryBlock();
+
+    // set entry to the beginning of the block
+    varsBuilder->SetInsertPoint(&entryBlock, entryBlock.begin());
+    // varsBuilder->SetInsertPoint(&curFn->getEntryBlock());
 
     auto varAlloc = varsBuilder->CreateAlloca(type, 0, name.c_str());
 
@@ -482,7 +487,8 @@ Object IRGenerator::visitAssignExpr(shared_ptr<Assign<Object>> expr) {
         Error::addError(name, "[CyLang]: Undefined variable: " + name.lexeme);
         throw std::runtime_error("Undefined variable");
     }
-    if (varBinding->getType() != value->getType()) {
+    if (auto ptrType = llvm::dyn_cast<llvm::PointerType>(varBinding->getType());
+        ptrType && ptrType->getPointerElementType() != value->getType()) {
         Error::addError(name, "[CyLang]: Target type mismatch");
         throw std::runtime_error("Type mismatch");
     }
@@ -916,7 +922,7 @@ void IRGenerator::visitClassStmt(const Class &stmt) {
 void IRGenerator::visitIfStmt(const If &stmt) {
     auto conditon = evaluate(stmt.main_branch.condition);
 
-    auto thenBlock = createBB("then", fn);
+    auto thenBlock = createBB("then", curFn);
     // else, if-end block to handle nested if expression
     auto elseBlock = createBB("else");
     auto ifEndBlock = createBB("ifend");
@@ -933,8 +939,8 @@ void IRGenerator::visitIfStmt(const If &stmt) {
     thenBlock = builder->GetInsertBlock();
     // else branch
     // append block to function
-    elseBlock->insertInto(fn);// in llvm 17
-    // fn->getBasicBlockList().push_back(elseBlock); in llvm 14
+    // elseBlock->insertInto(curFn);// in llvm 17
+    curFn->getBasicBlockList().push_back(elseBlock);// in llvm 14
     builder->SetInsertPoint(elseBlock);
     llvm::Value *elseRes = lastValue;
     if (stmt.else_branch != nullptr) {
@@ -950,8 +956,8 @@ void IRGenerator::visitIfStmt(const If &stmt) {
     // same for else block
     elseBlock = builder->GetInsertBlock();
     // endif
-    ifEndBlock->insertInto(fn);
-    // fn->getBasicBlockList().push_back(ifEndBlock);
+    // ifEndBlock->insertInto(fn);
+    curFn->getBasicBlockList().push_back(ifEndBlock);
     builder->SetInsertPoint(ifEndBlock);
 
     // result of if expression is phi
@@ -962,7 +968,7 @@ void IRGenerator::visitIfStmt(const If &stmt) {
 }
 void IRGenerator::visitWhileStmt(const While &stmt) {
     // condition
-    auto condBlock = createBB("cond", fn);
+    auto condBlock = createBB("cond", curFn);
     builder->CreateBr(condBlock);
 
     // Body:while end loop
@@ -977,7 +983,7 @@ void IRGenerator::visitWhileStmt(const While &stmt) {
     builder->CreateCondBr(condition, bodyBlock, loopEndBlock);
 
     // body
-    bodyBlock->insertInto(fn);
+    curFn->getBasicBlockList().push_back(bodyBlock);
     builder->SetInsertPoint(bodyBlock);
     execute(stmt.body);
 
@@ -985,7 +991,7 @@ void IRGenerator::visitWhileStmt(const While &stmt) {
     builder->CreateBr(condBlock);
 
     // end while
-    loopEndBlock->insertInto(fn);
+    curFn->getBasicBlockList().push_back(loopEndBlock);
     builder->SetInsertPoint(loopEndBlock);
     lastValue = builder->getInt32(0);
 }
@@ -996,18 +1002,18 @@ void IRGenerator::visitFunctionStmt(shared_ptr<Function> stmt) {
     auto funBody = stmt->body;
 
     // save current function
-    auto prevFn = fn;
+    auto prevFn = curFn;
     auto prevBlock = builder->GetInsertBlock();
     auto prevEnv = environment;
     // override fn to compile body
     auto newFn = createFunction(fnName, excrateFunType(stmt), environment);
-    fn = newFn;
+    curFn = newFn;
 
     // set parameter name
     auto idx = 0;
     environment = std::make_shared<Environment>(environment, std::map<std::string, llvm::Value *>{});
 
-    for (auto &arg: fn->args()) {
+    for (auto &arg: curFn->args()) {
         auto param = params[idx++];
         auto argName = param.first.lexeme;
         arg.setName(argName);
@@ -1022,7 +1028,7 @@ void IRGenerator::visitFunctionStmt(shared_ptr<Function> stmt) {
 
     // restore previous env after compiling
     builder->SetInsertPoint(prevBlock);
-    fn = prevFn;
+    curFn = prevFn;
     environment = prevEnv;
 
     // Validate the generated code, checking for consistency.
