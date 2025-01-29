@@ -4,6 +4,7 @@
 #include "../include/Stmt.hpp"
 #include "../include/Token.hpp"
 #include "Object.hpp"
+#include <cstdint>
 #include <llvm-14/llvm/IR/Constant.h>
 #include <llvm-14/llvm/IR/Constants.h>
 #include <llvm-14/llvm/IR/DerivedTypes.h>
@@ -25,6 +26,7 @@
 #include <regex>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 llvm::Value *IRGenerator::lastValue = nullptr;
 void IRGenerator::compileAndSave(vector<shared_ptr<Stmt>> &statements) {
@@ -182,7 +184,7 @@ llvm::Type *IRGenerator::excrateVarType(std::shared_ptr<Expr<Object>> expr) {
     return builder->getInt32Ty();
 }
 
-llvm::Type *IRGenerator::excrateTypeByName(const string &typeName, const Token tok) {
+llvm::Type *IRGenerator::excrateTypeByName(const string &typeName, const Token tok, const std::vector<uint64_t> &dims = {}) {
 
     if (typeName == "int") {
         return builder->getInt32Ty();
@@ -192,10 +194,15 @@ llvm::Type *IRGenerator::excrateTypeByName(const string &typeName, const Token t
         return builder->getInt1Ty();
     } else if (typeName == "double") {
         return builder->getDoubleTy();
-    }
-    // if var type's prefix is 'list'
-    else if (typeName.find("list") == 0) {
-        return builder->getInt32Ty()->getPointerTo();
+    } else if (typeName.find("list<") == 0) {// nested list, like list<list<int>>
+        string innerType = typeName.substr(5, typeName.size() - 6);
+        llvm::Type *baseType = excrateTypeByName(innerType, tok, dims);//recursively retrive type util base
+
+        llvm::Type *finalType = baseType;
+        for (auto it = dims.rbegin(); it != dims.rend(); ++it) {// based on dimension recover the array type
+            finalType = llvm::ArrayType::get(finalType, *it);
+        }
+        return finalType;
     } else if (typeName == "") {
         return builder->getInt32Ty();
     }
@@ -272,19 +279,53 @@ llvm::Value *IRGenerator::mallocInstance(llvm::StructType *cls, const std::strin
 
 llvm::Value *IRGenerator::createList(shared_ptr<List<Object>> expr, string elemType = "int") {
     auto listSize = expr->items.size();
-    // suppose list element type is int
-    // check element type
-    llvm::Type *elementType = excrateTypeByName(elemType, expr->opening_bracket);
 
-    auto listType = llvm::ArrayType::get(elementType, listSize);
-    auto list = builder->CreateAlloca(listType, 0, "list");
-
-    for (auto i = 0; i < listSize; i++) {
-        auto value = evaluate(expr->items[i]);
-        auto ptr = builder->CreateInBoundsGEP(listType, list, {builder->getInt32(0), builder->getInt32(i)});
-        builder->CreateStore(value, ptr);
+    // derive the dimension of list
+    vector<uint64_t> dimensions{};
+    auto currentExpr = expr;
+    while (true) {
+        dimensions.push_back(currentExpr->items.size());
+        if (currentExpr->items.empty() ||
+            currentExpr->items[0]->type != ExprType::List) break;
+        currentExpr = std::dynamic_pointer_cast<List<Object>>(currentExpr->items[0]);
     }
-    return list;
+    // nested list type using calculated dimension; [2x[3xi32]]
+    llvm::Type *finalType = excrateTypeByName(elemType, expr->opening_bracket, dimensions);
+
+    // memory allocation
+    auto listAlloc = builder->CreateAlloca(finalType, nullptr, "list");
+
+    // 递归初始化函数
+    std::function<void(llvm::Value *, shared_ptr<List<Object>>, size_t)> initArray;
+    initArray = [&](llvm::Value *basePtr, shared_ptr<List<Object>> currList, size_t dim) {
+        for (size_t i = 0; i < currList->items.size(); ++i) {
+            llvm::Value *indices[] = {builder->getInt32(0), builder->getInt32(i)};
+            auto elemPtr = builder->CreateInBoundsGEP(
+                basePtr->getType()->getPointerElementType(),
+                basePtr,
+                indices
+            );
+
+            if (dim < dimensions.size() - 1) {// process nested dimension recursively
+                auto subList = std::dynamic_pointer_cast<List<Object>>(currList->items[i]);
+                // clang-format off
+                if (!subList || subList->items.size() != dimensions[dim + 1]) {
+                    Error::addError(expr->opening_bracket, "Sub-list size mismatch. Expected " 
+                                                                            + std::to_string(dimensions[dim + 1]) 
+                                                                            + ", got " + std::to_string(subList->items.size()));
+                    throw std::runtime_error("Dimension mismatch");
+                }
+                // clang-format on
+                initArray(elemPtr, subList, dim + 1);
+            } else {
+                auto val = evaluate(currList->items[i]);
+                builder->CreateStore(val, elemPtr);
+            }
+        }
+    };
+
+    initArray(listAlloc, expr, 0);
+    return listAlloc;
 }
 
 
@@ -849,16 +890,29 @@ void IRGenerator::visitVarStmt(const Var &stmt) {
             Values.push_back(lastValue);
             return;
         } else if (stmt.initializer->type == ExprType::List) {
-            std::regex pattern(R"(^list<(.+)>$)");
-            std::smatch match;
-            std::regex_search(stmt.typeName, match, pattern);
-            auto list = createList(std::dynamic_pointer_cast<List<Object>>(stmt.initializer), match[1]);
+            string elemType = stmt.typeName.substr(5, stmt.typeName.size() - 6);// list<T> => T
+            auto list = createList(std::dynamic_pointer_cast<List<Object>>(stmt.initializer), elemType);
             lastValue = environment->define(varName, list);
             Values.push_back(lastValue);
             return;
         }
         auto init = evaluate(stmt.initializer);
-        auto varTy = excrateTypeByName(stmt.typeName, stmt.name);
+        llvm::Type *varTy = nullptr;
+        vector<uint64_t> dimensions{};
+        // check if init is array
+        if (auto arrayType = llvm::dyn_cast<llvm::ArrayType>(init->getType())) {
+
+            auto array = llvm::dyn_cast<llvm::ConstantArray>(init);
+            // cal array dimension
+            while (arrayType) {
+                dimensions.push_back(arrayType->getNumElements());
+                arrayType = llvm::dyn_cast<llvm::ArrayType>(arrayType->getElementType());
+            }
+            varTy = excrateTypeByName(stmt.typeName, stmt.name, dimensions);
+        } else {
+            varTy = excrateTypeByName(stmt.typeName, stmt.name);
+        }
+
         if (varTy != init->getType()) {
             Error::addError(stmt.name, "[CyLang]: Variable decalaration type mismatch");
             throw std::runtime_error("Type mismatch");

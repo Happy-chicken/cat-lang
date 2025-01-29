@@ -86,9 +86,9 @@ private:
     llvm::Value *createList(shared_ptr<List<Object>> expr, string elemType);                  // create a list
 
     // extract type
-    llvm::Type *excrateVarType(std::shared_ptr<Expr<Object>> expr);        // extract type from expression
-    llvm::Type *excrateTypeByName(const string &typeName, const Token tok);// extract type from string
-    llvm::FunctionType *excrateFunType(shared_ptr<Function> stmt);         // extract function type
+    llvm::Type *excrateVarType(std::shared_ptr<Expr<Object>> expr);                                           // extract type from expression
+    llvm::Type *excrateTypeByName(const string &typeName, const Token tok, const std::vector<uint64_t> &dims);// extract type from string
+    llvm::FunctionType *excrateFunType(shared_ptr<Function> stmt);                                            // extract function type
 
     size_t getTypeSize(llvm::Type *type);
     llvm::StructType *getClassByName(const std::string &name);// get class by name
