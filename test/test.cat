@@ -1,4 +1,4 @@
 var a:list<list<int>> = [[1,2,3],[4,5,6]];
 var b:list<int> =a[1];
-var c:int = b[1];
+var c:int = a[1][1];
 print("c=%d", c);

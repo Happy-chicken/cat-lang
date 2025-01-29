@@ -70,10 +70,17 @@ def add(x:int, y:int)->int
 ```
 
 ### list
-nested list? Idk...
+nested list? Idk...(support!)
+rvalue subsript is not supported now...
 ```python
 var l:list<int> = [1, 2, 3];
 var s:int = l[0];
+
+var l2:lsit<list<int>> = [[1, 2, 3], [4, 5, 6]];
+var s2:list<int> = l[0];
+var t2:int = s[0];
+
+# l2[0][0] is not supported
 ```
 
 ### class
