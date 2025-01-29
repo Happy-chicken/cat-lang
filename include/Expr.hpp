@@ -59,6 +59,11 @@ class Self;
 template<class R>
 class Super;
 
+struct VarType {
+    string name;
+    vector<std::shared_ptr<VarType>> generics;// generic arguments
+};
+
 enum class ExprType {
     Literal,
     Assign,

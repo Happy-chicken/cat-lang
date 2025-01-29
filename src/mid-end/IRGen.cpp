@@ -849,7 +849,7 @@ void IRGenerator::visitVarStmt(const Var &stmt) {
             Values.push_back(lastValue);
             return;
         } else if (stmt.initializer->type == ExprType::List) {
-            std::regex pattern(R"(<(.*?)>)");
+            std::regex pattern(R"(^list<(.+)>$)");
             std::smatch match;
             std::regex_search(stmt.typeName, match, pattern);
             auto list = createList(std::dynamic_pointer_cast<List<Object>>(stmt.initializer), match[1]);

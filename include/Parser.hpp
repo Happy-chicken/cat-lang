@@ -62,6 +62,7 @@ private:
     // shared_ptr<Stmt> tryStatement();
     // shared_ptr<Stmt> throwStatement();
 
+    shared_ptr<VarType> parseVarType();// parse nested list
     bool match(const initializer_list<TokenType> &types);
     bool check(TokenType type);
     Token advance();
@@ -71,14 +72,6 @@ private:
     Token consume(TokenType type, string message);
     runtime_error error(Token token, string message);
     void synchronize();
-
-    // class ParseError : public runtime_error
-    // {
-    // public:
-    //    ParseError() : runtime_error("") {}
-    // };
-
-    // ParseError error(const Token &token, string message) const;
 };
 
 #endif// PARSER_HPP_

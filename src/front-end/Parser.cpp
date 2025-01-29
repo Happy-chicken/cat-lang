@@ -1,6 +1,7 @@
 #include <climits>
 #include <initializer_list>
 #include <iostream>
+#include <math.h>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -55,27 +56,47 @@ shared_ptr<Stmt> Parser::declaration() {
         return nullptr;
     }
 }
-/// @brief parsre a variable declaration, like var a;
+
+shared_ptr<VarType> Parser::parseVarType() {
+    auto varType = std::make_shared<VarType>();
+    if (match({INT, DOUBLE, BOOL, STR, IDENTIFIER})) {
+        varType->name = previous().lexeme;
+        return varType;
+    }
+    if (match({LIST})) {// support nested list
+        varType->name = previous().lexeme;
+        consume(LESS, "[Cat-Lang] Expect '<' after list.");
+        varType->generics.push_back(parseVarType());
+        consume(GREATER, "[Cat-Lang] Expect '>' after list.");
+    } else {
+        error(peek(), "[Cat-Lang] Expect variable type.");
+    }
+    return varType;
+}
+
+/// @brief parsre a variable declaration, like var a:int;
 /// @return var Stmt Node, one parsed data
 shared_ptr<Stmt> Parser::varDeclaration() {
     Token identifier = consume(IDENTIFIER, "[Cat-Lang] Expect variable.");
     Token colon = consume(COLON, "[Cat-Lang] Expect ':' after variable.");
     string typeName{""};
-    if (match({INT, DOUBLE, BOOL, STR, LIST, IDENTIFIER})) {
-        typeName = previous().lexeme;
-        if (previous().type == LIST) {
-            consume(LESS, "[Cat-Lang] Expect '<' after list.");
-            if (match({INT, DOUBLE, BOOL, STR, IDENTIFIER})) {
-                typeName += "<" + previous().lexeme + ">";
-                consume(GREATER, "[Cat-Lang] Expect '>' after list.");
-            } else {
-                error(peek(), "[Cat-Lang] Expect list element type.");
-            }
-        }
+    auto type = parseVarType();
+    // convert it back to string
+    if (type->generics.size() == 0) {
+        typeName = type->name;
     } else {
-        error(peek(), "[Cat-Lang] Expect variable type.");
+        auto inner = type->generics;
+        typeName = type->name;
+        int nested{0};
+        while (inner.size() != 0) {
+            typeName = typeName + "<" + inner[0]->name;
+            inner = inner[0]->generics;
+            nested++;
+        }
+        while (nested--) {
+            typeName += ">";
+        }
     }
-    // typeName = consume(IDENTIFIER, "[Cat-Lang] Expect variable type.").lexeme;
     shared_ptr<Expr<Object>> initializer =
         match({EQUAL}) ? expression() : nullptr;
     consume(SEMICOLON, "[Cat-Lang] Expect ';' after variable declaration.");
@@ -580,7 +601,7 @@ Parser::finishSubscript(shared_ptr<Expr<Object>> identifier) {
 
     // Forbid calling rvalues.
     if (!dynamic_cast<Variable<Object> *>(identifier.get())) {
-        throw error(peek(), "[Cat-Lang] Object is not subscriptable.");
+        throw error(peek(), "[Cat-Lang] rvalue is not subscriptable.");
     }
 
     auto var = dynamic_cast<Variable<Object> *>(identifier.get())->name;

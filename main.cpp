@@ -7,7 +7,7 @@ int main(int argc, char *argv[]) {
     std::string mode;
     Cat cat(argc, argv);
     cat.isUseJIT = true;
-    if (argc > 1) {
+    if (argc == 3) {
         mode = argv[1];
         filePath = argv[2];
         // ---------------------------------------------------------------------------
@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
         if (mode == "build") cat.buildFile(filePath);
         // ---------------------------------------------------------------------------
     } else {
-        std::cout << "\t[usage]: cat <file.cat>" << std::endl;
+        std::cout << "\t[usage]: cat build <file.cat>\n\t\t cat run <file.cat>" << std::endl;
         std::cout << cat.logo << std::endl;
     }
 
