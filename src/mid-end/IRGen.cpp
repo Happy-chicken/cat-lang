@@ -196,13 +196,15 @@ llvm::Type *IRGenerator::excrateTypeByName(const string &typeName, const Token t
         return builder->getDoubleTy();
     } else if (typeName.find("list<") == 0) {// nested list, like list<list<int>>
         string innerType = typeName.substr(5, typeName.size() - 6);
-        llvm::Type *baseType = excrateTypeByName(innerType, tok, dims);//recursively retrive type util base
 
-        llvm::Type *finalType = baseType;
-        for (auto it = dims.rbegin(); it != dims.rend(); ++it) {// based on dimension recover the array type
-            finalType = llvm::ArrayType::get(finalType, *it);
-        }
-        return finalType;
+        uint64_t currentDim = dims[0];
+        std::vector<uint64_t> remainingDims(dims.begin() + 1, dims.end());
+
+        //recursively retrive type util base
+        llvm::Type *innerTypePtr = excrateTypeByName(innerType, tok, remainingDims);
+
+        // consturct list type of current level
+        return llvm::ArrayType::get(innerTypePtr, currentDim);
     } else if (typeName == "") {
         return builder->getInt32Ty();
     }
@@ -277,9 +279,7 @@ llvm::Value *IRGenerator::mallocInstance(llvm::StructType *cls, const std::strin
     return instance;
 }
 
-llvm::Value *IRGenerator::createList(shared_ptr<List<Object>> expr, string elemType = "int") {
-    auto listSize = expr->items.size();
-
+llvm::Value *IRGenerator::createList(shared_ptr<List<Object>> expr, string ListType = "list<int>") {
     // derive the dimension of list
     vector<uint64_t> dimensions{};
     auto currentExpr = expr;
@@ -290,7 +290,7 @@ llvm::Value *IRGenerator::createList(shared_ptr<List<Object>> expr, string elemT
         currentExpr = std::dynamic_pointer_cast<List<Object>>(currentExpr->items[0]);
     }
     // nested list type using calculated dimension; [2x[3xi32]]
-    llvm::Type *finalType = excrateTypeByName(elemType, expr->opening_bracket, dimensions);
+    llvm::Type *finalType = excrateTypeByName(ListType, expr->opening_bracket, dimensions);
 
     // memory allocation
     auto listAlloc = builder->CreateAlloca(finalType, nullptr, "list");
@@ -686,7 +686,15 @@ Object IRGenerator::visitSubscriptExpr(shared_ptr<Subscript<Object>> expr) {
     auto elementTy = listType->getArrayElementType();
     // elementTy->dump();// i8*
     auto ptr = builder->CreateInBoundsGEP(listType, list, {builder->getInt32(0), index});
-    lastValue = builder->CreateLoad(elementTy, ptr);
+
+    if (expr->value != nullptr) {// assignment(lvalue)
+        auto value = evaluate(expr->value);
+        lastValue = builder->CreateStore(value, ptr);
+    } else {// rvalue
+        lastValue = builder->CreateLoad(elementTy, ptr);
+    }
+
+
     return Object::make_llvmval_obj(lastValue);
 }
 
@@ -890,8 +898,8 @@ void IRGenerator::visitVarStmt(const Var &stmt) {
             Values.push_back(lastValue);
             return;
         } else if (stmt.initializer->type == ExprType::List) {
-            string elemType = stmt.typeName.substr(5, stmt.typeName.size() - 6);// list<T> => T
-            auto list = createList(std::dynamic_pointer_cast<List<Object>>(stmt.initializer), elemType);
+            // string elemType = stmt.typeName.substr(5, stmt.typeName.size() - 6);// list<T> => T
+            auto list = createList(std::dynamic_pointer_cast<List<Object>>(stmt.initializer), stmt.typeName);
             lastValue = environment->define(varName, list);
             Values.push_back(lastValue);
             return;

@@ -83,7 +83,7 @@ private:
     llvm::GlobalVariable *createGlobalVariable(const std::string &name, llvm::Constant *init);// create a global variable
     llvm::Value *createInstance(shared_ptr<Call<Object>> expr, const std::string &varName);   // create instance
     llvm::Value *mallocInstance(llvm::StructType *cls, const std::string &name);              // allocate an object of a given class on the heap
-    llvm::Value *createList(shared_ptr<List<Object>> expr, string elemType);                  // create a list
+    llvm::Value *createList(shared_ptr<List<Object>> expr, string listType);                  // create a list
 
     // extract type
     llvm::Type *excrateVarType(std::shared_ptr<Expr<Object>> expr);                                           // extract type from expression

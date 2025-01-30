@@ -1,4 +1,10 @@
-var a:list<list<int>> = [[1,2,3],[4,5,6]];
-var b:list<int> =a[1];
-var c:int = a[1][1];
-print("c=%d", c);
+
+var a:list<int> = [1,2,3];
+var i:int = 0;
+while(i<3)
+{
+    print("a[%d]=%d\n", i, a[i]);
+    i=i+1;
+}
+
+

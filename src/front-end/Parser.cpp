@@ -378,19 +378,19 @@ shared_ptr<Expr<Object>> Parser::assignment() {
         Token equals = previous();
         shared_ptr<Expr<Object>> value = assignment();
 
-        if (auto subscript = dynamic_cast<Subscript<Object> *>(expr.get());
+        if (auto subscript = dynamic_pointer_cast<Subscript<Object>>(expr);
             subscript != nullptr) {
             Token name = subscript->identifier;
             return std::make_shared<Subscript<Object>>(
                 std::move(name), subscript->index, std::move(value)
             );
         }
-        if (auto variable = dynamic_cast<Variable<Object> *>(expr.get());
+        if (auto variable = dynamic_pointer_cast<Variable<Object>>(expr);
             variable != nullptr) {
             Token name = variable->name;
             return std::make_shared<Assign<Object>>(name, value);
         }
-        if (auto get = dynamic_cast<Get<Object> *>(expr.get()); get != nullptr) {
+        if (auto get = dynamic_pointer_cast<Get<Object>>(expr); get != nullptr) {
             return std::make_shared<Set<Object>>(get->object, get->name, value);
         }
         error(equals, "[Cat-Lang] Invalid assignment target.");
@@ -575,19 +575,17 @@ shared_ptr<Expr<Object>> Parser::finishCall(shared_ptr<Expr<Object>> callee) {
     return std::make_shared<Call<Object>>(callee, paren, arguments);
 }
 
-/// @brief parse a subscript expression, like a[]
+/// @brief parse a subscript expression, like a[][]
 /// @return
 shared_ptr<Expr<Object>> Parser::subscript() {
     shared_ptr<Expr<Object>> expr = primary();
-
     while (true) {
-        if (match({TokenType::LEFT_BRACKET})) {
-            expr = finishSubscript(std::move(expr));
+        if (match({LEFT_BRACKET})) {
+            expr = finishSubscript(expr);
         } else {
             break;
         }
     }
-
     return expr;
 }
 
