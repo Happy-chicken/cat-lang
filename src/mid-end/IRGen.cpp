@@ -1102,8 +1102,10 @@ void IRGenerator::visitFunctionStmt(shared_ptr<Function> stmt) {
 }
 
 void IRGenerator::visitReturnStmt(const Return &stmt) {
-    auto returnVal = evaluate(stmt.value);
-    builder->CreateRet(returnVal);
+    if (stmt.value != nullptr) {
+        auto returnVal = evaluate(stmt.value);
+        builder->CreateRet(returnVal);
+    }
 }
 
 void IRGenerator::visitBreakStmt(const Break &stmt) {}

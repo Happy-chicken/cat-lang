@@ -29,12 +29,19 @@ add_definitions(${LLVM_DEFINITIONS})
 # include directories
 include_directories("${PROJECT_SOURCE_DIR}/include")
 
+# set the test files directory
+set(TEST_DIR "${PROJECT_SOURCE_DIR}/test")
+
 # Set the source files directory
 set(SOURCE_DIR "${PROJECT_SOURCE_DIR}/src")
 
 # Collect all source files
 file(GLOB_RECURSE SOURCES "${SOURCE_DIR}/*.cpp"
-                          "${SOURCE_DIR}/front-end/*.cpp"
+                          "${SOURCE_DIR}/common/sematic/*.cpp"
+                          "${SOURCE_DIR}/front-end/scanner/*.cpp"
+                          "${SOURCE_DIR}/front-end/parser/*.cpp"
+                          "${SOURCE_DIR}/front-end/sematic/*.cpp"
+                          "${SOURCE_DIR}/front-end/symbol/*.cpp"
                           "${SOURCE_DIR}/mid-end/*.cpp"
                           "${SOURCE_DIR}/back-end/*.cpp"
                           "${SOURCE_DIR}/vm/*.cpp")
@@ -63,3 +70,10 @@ target_compile_options(CatLang PRIVATE -fstandalone-debug)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION} at ${LLVM_DIR}")
 message(STATUS "Found SOURCES:  ${SOURCES}")
+
+add_custom_target(test
+    COMMAND CatLang build ${TEST_DIR}/test.cat
+    DEPENDS CatLang
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+
