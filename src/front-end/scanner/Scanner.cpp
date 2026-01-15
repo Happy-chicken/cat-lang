@@ -1,10 +1,9 @@
-#include <iostream>
 #include <string>
 #include <vector>
 
-#include "../include/Logger.hpp"
-#include "../include/Scanner.hpp"
-#include "../include/Token.hpp"
+#include "Logger.hpp"
+#include "Scanner.hpp"
+#include "Token.hpp"
 
 using std::string;
 using std::vector;
@@ -44,7 +43,8 @@ const unordered_map<string, TokenType> Scanner::keywords = {
     // TODO
     {"lambda", LAMBDA},
     {"try", TRY},
-    {"throw", THROW}};
+    {"throw", THROW}
+};
 
 Scanner::Scanner(string source) : source(std::move(source)) {}
 

@@ -1,8 +1,6 @@
 
-#include "../include/Environment.hpp"
+#include "Environment.hpp"
 #include <map>
-#include <memory>
-#include <stdexcept>
 #include <string>
 
 using std::string;

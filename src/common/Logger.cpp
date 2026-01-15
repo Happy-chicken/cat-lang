@@ -1,4 +1,4 @@
-#include "../include/Logger.hpp"
+#include "Logger.hpp"
 #include <string>
 
 namespace Error {

@@ -1,6 +1,5 @@
 #include <climits>
 #include <initializer_list>
-#include <iostream>
 #include <math.h>
 #include <memory>
 #include <stdexcept>
@@ -8,11 +7,11 @@
 #include <utility>
 #include <vector>
 
-#include "../include/Expr.hpp"
-#include "../include/Logger.hpp"
-#include "../include/Parser.hpp"
-#include "../include/Stmt.hpp"
-#include "../include/Token.hpp"
+#include "Expr.hpp"
+#include "Logger.hpp"
+#include "Parser.hpp"
+#include "Stmt.hpp"
+#include "Token.hpp"
 
 using std::initializer_list;
 using std::runtime_error;

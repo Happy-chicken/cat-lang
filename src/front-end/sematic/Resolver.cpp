@@ -4,11 +4,11 @@
 #include <memory>
 #include <vector>
 
-#include "../include/Expr.hpp"
-#include "../include/Logger.hpp"
-#include "../include/Resolver.hpp"
-#include "../include/Stmt.hpp"
-#include "../include/Token.hpp"
+#include "Expr.hpp"
+#include "Logger.hpp"
+#include "Resolver.hpp"
+#include "Stmt.hpp"
+#include "Token.hpp"
 
 
 using std::map;

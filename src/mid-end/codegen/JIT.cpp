@@ -1,4 +1,4 @@
-#include "../include/JIT.hpp"
+#include "JIT.hpp"
 #include <cstdlib>
 #include <llvm-14/llvm/ExecutionEngine/Orc/ExecutionUtils.h>
 #include <llvm-14/llvm/ExecutionEngine/Orc/LLJIT.h>

@@ -1,9 +1,9 @@
-#include "../include/IRGen.hpp"
-#include "../include/Expr.hpp"
-#include "../include/Logger.hpp"
-#include "../include/Stmt.hpp"
-#include "../include/Token.hpp"
+#include "IRGen.hpp"
+#include "Expr.hpp"
+#include "Logger.hpp"
 #include "Object.hpp"
+#include "Stmt.hpp"
+#include "Token.hpp"
 #include <cstdint>
 #include <llvm-14/llvm/IR/Constant.h>
 #include <llvm-14/llvm/IR/Constants.h>

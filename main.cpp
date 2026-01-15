@@ -1,6 +1,7 @@
-#include "./include/ASTPrinter.hpp"
-#include "./include/Cat.hpp"
-#include "./include/Logger.hpp"
+#include "ASTPrinter.hpp"
+#include "Cat.hpp"
+#include "Logger.hpp"
+#include <iostream>
 
 int main(int argc, char *argv[]) {
     std::string filePath;// = "/home/buyi/code/cat-lang/test/test.cat";

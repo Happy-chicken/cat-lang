@@ -1,7 +1,17 @@
-#include "../include/Cat.hpp"
+#include "Cat.hpp"
+#include "IRGen.hpp"
+#include "JIT.hpp"
+#include "Logger.hpp"
+#include "Parser.hpp"
+#include "Resolver.hpp"
+#include "Scanner.hpp"
+#include "Stmt.hpp"
+#include "VM.hpp"
 #include "Value.hpp"
+#include <fstream>
+#include <ios>
+#include <iostream>
 #include <memory>
-
 std::string Cat::logo{R"(
 ├─Welcome to Cat Programming Language!─┤
 ________________________________________

@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find LLVM package
-find_package(LLVM REQUIRED CONFIG)
+find_package(LLVM 14 REQUIRED CONFIG)
 
 #Find the libgc
 find_library(GC_LIB gc REQUIRED)
@@ -28,6 +28,7 @@ add_definitions(${LLVM_DEFINITIONS})
 
 # include directories
 include_directories("${PROJECT_SOURCE_DIR}/include")
+include_directories("${PROJECT_SOURCE_DIR}/include/ast")
 
 # set the test files directory
 set(TEST_DIR "${PROJECT_SOURCE_DIR}/test")
@@ -42,7 +43,9 @@ file(GLOB_RECURSE SOURCES "${SOURCE_DIR}/*.cpp"
                           "${SOURCE_DIR}/front-end/parser/*.cpp"
                           "${SOURCE_DIR}/front-end/sematic/*.cpp"
                           "${SOURCE_DIR}/front-end/symbol/*.cpp"
-                          "${SOURCE_DIR}/mid-end/*.cpp"
+                          "${SOURCE_DIR}/mid-end/codegen/*.cpp"
+                          "${SOURCE_DIR}/mid-end/ir/*.cpp"
+                          "${SOURCE_DIR}/mid-end/optimizer/*.cpp"
                           "${SOURCE_DIR}/back-end/*.cpp"
                           "${SOURCE_DIR}/vm/*.cpp")
 
