@@ -46,6 +46,7 @@ file(GLOB_RECURSE SOURCES "${SOURCE_DIR}/*.cpp"
                           "${SOURCE_DIR}/mid-end/codegen/*.cpp"
                           "${SOURCE_DIR}/mid-end/ir/*.cpp"
                           "${SOURCE_DIR}/mid-end/optimizer/*.cpp"
+                          "${SOURCE_DIR}/runtime/*.cpp"
                           "${SOURCE_DIR}/back-end/*.cpp"
                           "${SOURCE_DIR}/vm/*.cpp")
 

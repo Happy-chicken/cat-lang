@@ -24,6 +24,8 @@ public:
 private:
     vector<Token> tokens;
     int current = 0;
+
+private:
     shared_ptr<Expr<Object>> assignment();
     shared_ptr<Expr<Object>> orExpression();
     shared_ptr<Expr<Object>> andExpression();
