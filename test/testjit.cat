@@ -1,7 +1,21 @@
-if(1==2){
-    print("ture");
+
+class A{
+    var a:int
+    def foo()->int{}
 }
-else {
-    print("false1\n");
+
+def fun(a: ref int[5][5], b:int)->int{
+    var arr:int[5]
+    if (x+1<=1){}
 }
-2;
+
+def main() {
+    
+    var c:bool= ((1==2) and (1<2) or 3>1)
+    while(!1){
+    }
+    var a:A = A()
+    var b{}
+    
+    
+}

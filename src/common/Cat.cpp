@@ -1,13 +1,7 @@
 #include "Cat.hpp"
-#include "IRGen.hpp"
-#include "JIT.hpp"
-#include "Logger.hpp"
+#include "Diagnostics.hpp"
 #include "Parser.hpp"
-#include "Resolver.hpp"
 #include "Scanner.hpp"
-#include "Stmt.hpp"
-#include "VM.hpp"
-#include "Value.hpp"
 #include <fstream>
 #include <ios>
 #include <iostream>
@@ -32,18 +26,55 @@ ________________________________________
 |______________________________________|
 )"};
 
-void Cat::run(const std::string &program) {
-    // lexer analysis
-    auto scanner = std::make_unique<Scanner>(program);
-    auto tokens = scanner->scanTokens();
-    // ---------------------------------------------------------------------------
-    // syntax analysis
-    auto parser = std::make_unique<Parser>(tokens);
-    auto statements = parser->parse();
-    if (Error::hadError) {
-        Error::report();
-        exit(EXIT_FAILURE);
+// void Cat::run(const std::string &program) {
+//     // lexer analysis
+//     auto scanner = std::make_unique<Scanner>(program);
+//     auto tokens = scanner->scanTokens();
+//     // ---------------------------------------------------------------------------
+//     // syntax analysis
+//     auto parser = std::make_unique<Parser>(tokens);
+//     auto statements = parser->parse();
+//     if (Error::hadError) {
+//         Error::report();
+//         exit(EXIT_FAILURE);
+//     }
+//     // ---------------------------------------------------------------------------
+//     // semantic analysis
+//     // auto resolver = std::make_shared<Resolver>();
+//     // resolver->resolve(statements);
+//     // if (Error::hadError) {
+//     //     Error::report();
+//     //     exit(EXIT_FAILURE);
+//     // }
+//     // ---------------------------------------------------------------------------
+//     // vm execution
+//     auto vm = std::make_shared<CatStackVM>();
+
+//     auto res = vm->run(statements);
+//     vm->dump();
+//     std::cout << "Result: " << AS_INT(res) << '\n';
+// }
+
+void Cat::build(const string &program) {
+    // define diagnostics
+    auto diagnostics = Diagnostics();
+    cat::setGlobalDiagnostics(&diagnostics);
+    try {
+        // lexer analysis
+        auto scanner = Scanner(program);
+        // ---------------------------------------------------------------------------
+        // syntax analysis
+        auto parser = std::make_unique<Parser>(scanner);
+        auto root = parser->parse();
+        root->print(std::cout);
+        std::cout << "Done!\n";
+        // diagnostics.printAll();
+    } catch (const std::runtime_error &e) {
+        diagnostics.printAll();
+        std::cerr << "Build failed: " << e.what() << std::endl;
+        return;
     }
+
     // ---------------------------------------------------------------------------
     // semantic analysis
     // auto resolver = std::make_shared<Resolver>();
@@ -53,56 +84,27 @@ void Cat::run(const std::string &program) {
     //     exit(EXIT_FAILURE);
     // }
     // ---------------------------------------------------------------------------
-    // vm execution
-    auto vm = std::make_shared<CatStackVM>();
-
-    auto res = vm->run(statements);
-    vm->dump();
-    std::cout << "Result: " << AS_INT(res) << '\n';
-}
-
-void Cat::build(const string &program) {
-    // lexer analysis
-    auto scanner = std::make_unique<Scanner>(program);
-    auto tokens = scanner->scanTokens();
-    // ---------------------------------------------------------------------------
-    // syntax analysis
-    auto parser = std::make_unique<Parser>(tokens);
-    auto statements = parser->parse();
-    if (Error::hadError) {
-        Error::report();
-        exit(EXIT_FAILURE);
-    }
-    // ---------------------------------------------------------------------------
-    // semantic analysis
-    auto resolver = std::make_shared<Resolver>();
-    resolver->resolve(statements);
-    if (Error::hadError) {
-        Error::report();
-        exit(EXIT_FAILURE);
-    }
-    // ---------------------------------------------------------------------------
     // intermediate representation generation
-    auto ir_generator = std::make_shared<IRGenerator>();
-    ir_generator->compileAndSave(statements);
+    // auto ir_generator = std::make_shared<IRGenerator>();
+    // ir_generator->compileAndSave(statements);
     // ---------------------------------------------------------------------------
-    if (Error::hadError) {
-        Error::report();
-        exit(EXIT_FAILURE);
-    }
+    // if (Error::hadError) {
+    //     Error::report();
+    //     exit(EXIT_FAILURE);
+    // }
     // ---------------------------------------------------------------------------
     // JIT
-    if (isUseJIT) {
-        JIT catJit(ir_generator);
-        llvm::InitLLVM X(argc, argv);
-        llvm::InitializeNativeTarget();
-        llvm::InitializeNativeTargetAsmPrinter();
-        llvm::InitializeNativeTargetAsmParser();
-        std::unique_ptr<llvm::Module> M = catJit.loadModule();
+    // if (isUseJIT) {
+    //     JIT catJit(ir_generator);
+    //     llvm::InitLLVM X(argc, argv);
+    //     llvm::InitializeNativeTarget();
+    //     llvm::InitializeNativeTargetAsmPrinter();
+    //     llvm::InitializeNativeTargetAsmParser();
+    //     std::unique_ptr<llvm::Module> M = catJit.loadModule();
 
-        llvm::ExitOnError ExitOnErr(std::string(argv[0]) + ": ");
-        ExitOnErr(catJit.run(std::move(M), ir_generator->getContext(), argc, argv));
-    }
+    //     llvm::ExitOnError ExitOnErr(std::string(argv[0]) + ": ");
+    //     ExitOnErr(catJit.run(std::move(M), ir_generator->getContext(), argc, argv));
+    // }
 }
 
 std::string Cat::readFile(std::string_view filename) {
@@ -122,11 +124,11 @@ std::string Cat::readFile(std::string_view filename) {
 
 
 void Cat::buildFile(string path) {
-    std::string source = "{" + readFile(path) + "\n}";
+    std::string source = readFile(path);
     build(source);
 }
 
-void Cat::runFile(string path) {
-    std::string source = readFile(path);
-    run(source);
-}
+// void Cat::runFile(string path) {
+//     std::string source = readFile(path);
+//     run(source);
+// }

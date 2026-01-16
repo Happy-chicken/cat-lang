@@ -39,6 +39,7 @@ set(SOURCE_DIR "${PROJECT_SOURCE_DIR}/src")
 # Collect all source files
 file(GLOB_RECURSE SOURCES "${SOURCE_DIR}/*.cpp"
                           "${SOURCE_DIR}/common/sematic/*.cpp"
+                          "${SOURCE_DIR}/front-end/ast/*.cpp"
                           "${SOURCE_DIR}/front-end/scanner/*.cpp"
                           "${SOURCE_DIR}/front-end/parser/*.cpp"
                           "${SOURCE_DIR}/front-end/sematic/*.cpp"
@@ -54,21 +55,21 @@ file(GLOB_RECURSE SOURCES "${SOURCE_DIR}/*.cpp"
 add_executable(CatLang main.cpp ${SOURCES})
 
 #link the libgc
-target_link_libraries(CatLang ${GC_LIB})
+#target_link_libraries(CatLang ${GC_LIB})
 
 # Link the LLVM libraries
-llvm_map_components_to_libnames(LLVM_LIBS   
-    Analysis
-    Core
-    ExecutionEngine
-    InstCombine
-    Object
-    OrcJIT
-    RuntimeDyld
-    ScalarOpts
-    Support
-    native)
-target_link_libraries(CatLang ${LLVM_LIBS})
+#llvm_map_components_to_libnames(LLVM_LIBS   
+#    Analysis
+#    Core
+#    ExecutionEngine
+#    InstCombine
+#    Object
+#    OrcJIT
+#    RuntimeDyld
+#    ScalarOpts
+#    Support
+#    native)
+#target_link_libraries(CatLang ${LLVM_LIBS})
 
 target_compile_options(CatLang PRIVATE -fstandalone-debug)
 
@@ -76,7 +77,7 @@ message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION} at ${LLVM_DIR}")
 message(STATUS "Found SOURCES:  ${SOURCES}")
 
 add_custom_target(test
-    COMMAND CatLang build ${TEST_DIR}/test.cat
+    COMMAND CatLang build ${TEST_DIR}/testjit.cat
     DEPENDS CatLang
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )

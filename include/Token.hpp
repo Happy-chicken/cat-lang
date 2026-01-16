@@ -1,6 +1,6 @@
 #ifndef TOKEN_HPP_
 #define TOKEN_HPP_
-#include "Object.hpp"
+#include "Location.hpp"
 #include <string>
 using std::string;
 using std::to_string;
@@ -22,8 +22,8 @@ typedef enum {
     COLON,      // :
 
     // One or two character tokens.
-    RIGHT_BRACKET,// [
-    LEFT_BRACKET, // ]
+    RIGHT_BRACKET,// ]
+    LEFT_BRACKET, // [
     BANG,         // !
     BANG_EQUAL,   // !=
     EQUAL,        // =
@@ -60,8 +60,8 @@ typedef enum {
     RETURN,
     // none
     NONE,
-    // print
-    PRINT,
+    // refernce
+    REF,
     // class
     CLASS,
     SUPER,
@@ -90,20 +90,17 @@ typedef enum {
 class Token {
 public:
     Token()
-        : type(TokenType::NONE), lexeme(""), literal(Object::make_none_obj()),
-          line(-1), column(-1) {}
-    Token(TokenType type, string lexeme, Object literal, int line, int column = -1)
-        : type(type), lexeme(lexeme), literal(literal), line(line), column(column) {}
+        : type(TokenType::NONE), lexeme(""), location(-1, -1) {}
+    Token(TokenType type, string lexeme, int line, int column = -1)
+        : type(type), lexeme(lexeme), location(line, column) {}
 
     string toString() {
         auto msg = to_string(type) + " lexeme: '" + lexeme + "'";
-        return literal.toString() == "" ? msg : msg + " liteal: " + literal.toString();
+        return msg;
     }
     TokenType type;
     string lexeme;
-    Object literal;
-    int line;
-    int column;
+    Location location;
 };
 
 #endif// TOKEN_HPP_

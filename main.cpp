@@ -1,6 +1,5 @@
-#include "ASTPrinter.hpp"
+// #include "ASTPrinter.hpp"
 #include "Cat.hpp"
-#include "Logger.hpp"
 #include <iostream>
 
 int main(int argc, char *argv[]) {
@@ -12,9 +11,7 @@ int main(int argc, char *argv[]) {
         mode = argv[1];
         filePath = argv[2];
         // ---------------------------------------------------------------------------
-        Error::spnitList = Error::split(cat.readFile(filePath));
-        // ---------------------------------------------------------------------------
-        if (mode == "run") cat.runFile(filePath);
+        // if (mode == "run") cat.runFile(filePath);
         if (mode == "build") cat.buildFile(filePath);
         // ---------------------------------------------------------------------------
     } else {

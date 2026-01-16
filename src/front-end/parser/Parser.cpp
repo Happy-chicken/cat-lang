@@ -7,709 +7,565 @@
 #include <utility>
 #include <vector>
 
-#include "Expr.hpp"
-#include "Logger.hpp"
+#include "AST.hpp"
+#include "Diagnostics.hpp"
+#include "Location.hpp"
 #include "Parser.hpp"
-#include "Stmt.hpp"
 #include "Token.hpp"
+#include "Types.hpp"
+
 
 using std::initializer_list;
+using std::make_shared;
 using std::runtime_error;
-using std::shared_ptr;
 using std::to_string;
-using std::vector;
 
-vector<shared_ptr<Stmt>> Parser::parse() {
-    vector<shared_ptr<Stmt>> statements;
+
+sptr<Program> Parser::parse() {
+    advance();
+    Location loc = currentLocation();
+    vec<uptr<Def>> defs;
     while (!isAtEnd()) {
-        statements.emplace_back(declaration());
+        defs.push_back(parseDeclarations());
     }
-    return statements;
+    return make_shared<Program>(loc, std::move(defs));
 }
 
-// main part of a parser ==> Stmt...
+// driver functions
+uptr<Def> Parser::parseDeclarations() {
+    if (check(DEF)) {
+        return parseFuncDef();
+    } else if (check(CLASS)) {
+        return parseClassDef();
+    }
+    // TODO: global variable
+    // } else if (check(VAR)) {
+    //     return parseVarDef();
+    // }
+    else {
+        throw error(peek(), "Expect 'def', 'class' or 'var' to declare function, class or variable.");
+    }
+}
 
-/// @brief parser a block
-/// @return list of statements
-vector<shared_ptr<Stmt>> Parser::block() {
-    vector<shared_ptr<Stmt>> statements;
-
+uptr<FuncDef> Parser::parseFuncDef() {
+    Location loc = currentLocation();
+    uptr<Header> header = parseHeader();
+    consume(LEFT_BRACE, "Expected '{' before function body.");
+    // parse local variable definitions
+    vec<uptr<Def>> local_defs;
+    while (check(DEF)) {
+        local_defs.push_back(parseFuncDef());
+    }
+    vec<uptr<Stmt>> statements;
     while (!check(RIGHT_BRACE) && !isAtEnd()) {
-        statements.emplace_back(declaration());
+        statements.push_back(parseStmt());
     }
-    consume(RIGHT_BRACE, "[Cat-Lang] Expect '}' after block.");
-    return statements;
+    consume(RIGHT_BRACE, "Expect '}'");
+    auto body = make_unique<Block>(currentLocation(), std::move(statements));
+    return make_unique<FuncDef>(loc, std::move(header), std::move(local_defs), std::move(body));
 }
 
-shared_ptr<Stmt> Parser::declaration() {
-    try {
-        if (match({CLASS}))
-            return classDeclaration();
-        if (match({DEF}))
-            return function("function");
-        if (match({VAR}))
-            return varDeclaration();
-        return statement();
-    } catch (runtime_error const &error) {
-        synchronize();
-        return nullptr;
-    }
-}
+uptr<ClassDef> Parser::parseClassDef() {
+    auto loc = currentLocation();
+    consume(CLASS, "Expect 'class'");
+    string class_name = consume(IDENTIFIER, "Expect class name.").lexeme;
 
-shared_ptr<VarType> Parser::parseVarType() {
-    auto varType = std::make_shared<VarType>();
-    if (match({INT, DOUBLE, BOOL, STR, IDENTIFIER})) {
-        varType->name = previous().lexeme;
-        return varType;
-    }
-    if (match({LIST})) {// support nested list
-        varType->name = previous().lexeme;
-        consume(LESS, "[Cat-Lang] Expect '<' after list.");
-        varType->generics.push_back(parseVarType());
-        consume(GREATER, "[Cat-Lang] Expect '>' after list.");
-    } else {
-        error(peek(), "[Cat-Lang] Expect variable type.");
-    }
-    return varType;
-}
+    consume(LEFT_BRACE, "Expect '{' before class body.");
 
-/// @brief parsre a variable declaration, like var a:int;
-/// @return var Stmt Node, one parsed data
-shared_ptr<Stmt> Parser::varDeclaration() {
-    Token identifier = consume(IDENTIFIER, "[Cat-Lang] Expect variable.");
-    Token colon = consume(COLON, "[Cat-Lang] Expect ':' after variable.");
-    string typeName{""};
-    auto type = parseVarType();
-    // convert it back to string
-    if (type->generics.size() == 0) {
-        typeName = type->name;
-    } else {
-        auto inner = type->generics;
-        typeName = type->name;
-        int nested{0};
-        while (inner.size() != 0) {
-            typeName = typeName + "<" + inner[0]->name;
-            inner = inner[0]->generics;
-            nested++;
-        }
-        while (nested--) {
-            typeName += ">";
+    vec<uptr<VarDef>> fields;
+    vec<uptr<FuncDef>> methods;
+
+    while (!check(RIGHT_BRACE)) {
+        if (check(VAR)) {
+            fields.push_back(parseVarDef());
+        } else if (check(DEF)) {
+            methods.push_back(parseFuncDef());
+        } else {
+            throw error(peek(), "Expect 'var' or 'def' in class body.");
         }
     }
-    shared_ptr<Expr<Object>> initializer =
-        match({EQUAL}) ? expression() : nullptr;
-    consume(SEMICOLON, "[Cat-Lang] Expect ';' after variable declaration.");
-    shared_ptr<Stmt> var = std::make_shared<Var>(identifier, initializer, typeName);
-    return var;
+
+    consume(RIGHT_BRACE, "Expect '}' after class body.");
+    return make_unique<ClassDef>(loc, class_name, std::move(fields), std::move(methods));
 }
 
-/// @brief parse the function declaration
-/// @param kind the kind of function
-/// @return
-shared_ptr<Function> Parser::function(string kind) {
-    Token identifier =
-        consume(IDENTIFIER, "[Cat-Lang] Expect " + kind + ".");
-    consume(LEFT_PAREN, "[Cat-Lang] Expect '(' after " + kind + ".");
-    vector<std::pair<Token, string>> parameters;
-    bool isFirst = true;
-    // handle the parameters like (a, b) or (a:int, b:int)
+
+uptr<Header> Parser::parseHeader() {
+    auto loc = currentLocation();
+    consume(DEF, "Expected 'def' keyword at the beginning of function declaration.");
+    auto token = consume(IDENTIFIER, "Expected function name after 'def' keyword.");
+    string func_name = token.lexeme;
+    consume(LEFT_PAREN, "Expected '(' after function name.");
+
+    vec<uptr<FuncParameterDef>> parameters = {};
     if (!check(RIGHT_PAREN)) {
-        do {
-            if (parameters.size() >= 255) {
-                error(peek(), "[Cat-Lang] Cannot have more than 255 parameters.");
-            }
-            if (kind == "method" && isFirst) {
-                auto self = consume(SELF, "[Cat-Lang] Expect self in method.");
-                parameters.emplace_back(self, "");
-                isFirst = false;
-                continue;
-            }
-            Token name = consume(IDENTIFIER, "[Cat-Lang] Expect non-keyword parameter.");
-            string typeName("");
-            consume(COLON, "[Cat-Lang] Except : after parameter.");
-            if (match({INT, DOUBLE, BOOL, STR, LIST, IDENTIFIER})) {
-                typeName = previous().lexeme;
-                if (previous().type == LIST) {
-                    consume(LESS, "[Cat-Lang] Expect '<' after list.");
-                    if (match({INT, DOUBLE, BOOL, STR, IDENTIFIER})) {
-                        typeName += "<" + previous().lexeme + ">";
-                        consume(GREATER, "[Cat-Lang] Expect '>' after list.");
-                    } else {
-                        error(peek(), "[Cat-Lang] Expect list element type.");
-                    }
-                }
-            } else {
-                error(peek(), "[Cat-Lang] Expect parameter type.");
-            }
-            parameters.emplace_back(name, typeName);
-        } while (match({COMMA}));
+        parameters = parseParameters();
     }
-    consume(RIGHT_PAREN, "[Cat-Lang] Expect ')' after parameters.");
+    consume(RIGHT_PAREN, "Expected ')' after function parameters.");
 
-    Token returnType;
+    optional<DataType::DataType> return_type;
     if (match({ARROW})) {
-        if (match({INT, DOUBLE, BOOL, STR, LIST, IDENTIFIER})) {
-            returnType = previous();
-            if (previous().type == LIST) {
-                consume(LESS, "[Cat-Lang] Expect '<' after list.");
-                if (match({INT, DOUBLE, BOOL, STR, IDENTIFIER})) {
-                    returnType.lexeme += "<" + previous().lexeme + ">";
-                    consume(GREATER, "[Cat-Lang] Expect '>' after list.");
-                } else {
-                    error(peek(), "[Cat-Lang] Expect list element type.");
-                }
-            }
+        return_type = parseDataType();
+    }
+    return make_unique<Header>(loc, std::move(func_name), std::move(return_type), std::move(parameters));
+}
+
+vec<uptr<FuncParameterDef>> Parser::parseParameters() {
+    vec<uptr<FuncParameterDef>> params;
+    do {
+        params.push_back(parseFuncParameterDef());
+    } while (match({COMMA}));
+    return params;
+}
+
+uptr<FuncParameterDef> Parser::parseFuncParameterDef() {
+    auto loc = currentLocation();
+    vec<string> names;
+    Token token = consume(IDENTIFIER, "Expected parameter name.");
+    consume(COLON, "expect type after parameter.");
+    names.push_back(token.lexeme);
+    bool is_ref = match({REF});
+
+    uptr<FuncParameterType> type = parseFuncParameterType(is_ref);
+    return make_unique<FuncParameterDef>(loc, std::move(names), std::move(type));
+}
+
+uptr<FuncParameterType> Parser::parseFuncParameterType(bool is_ref) {
+    auto loc = currentLocation();
+    DataType::DataType base_type = parseDataType();
+    vec<optional<int>> dims;
+    while (match({LEFT_BRACKET})) {
+        if (!check(RIGHT_BRACKET)) {
+            Token dim = consume(INTEGEL, "Index should be integel.");
+            dims.push_back(std::stoi(dim.lexeme));
         } else {
-            Error::addWarn(peek(), "[Cat-Lang] Expect function return value type.");
+            dims.push_back(std::nullopt);
         }
-        // returnType = consume(IDENTIFIER, "[Cat-Lang] Expect function return value type.");
-    } else {
-        Error::addWarn(peek(), "[Cat-Lang] Warn! function return int type.");
+        consume(RIGHT_BRACKET, "Expect ']'");
     }
-    consume(LEFT_BRACE, "[Cat-Lang] Expect '{' before " + kind + " body.");
-    auto body = block();
-    auto func = std::make_shared<Function>(identifier, parameters, body, returnType);
-    return func;
-}
-
-/// @brief parse the class declaration
-/// @return
-shared_ptr<Stmt> Parser::classDeclaration() {
-    Token identifier = consume(IDENTIFIER, "[Cat-Lang] Expect class.");
-
-    shared_ptr<Variable<Object>> superclass;
-    if (match({LESS})) {
-        consume(IDENTIFIER, "[Cat-Lang] Expect superclass.");
-        superclass = std::make_shared<Variable<Object>>(previous());
+    if (dims.empty()) {
+        return make_unique<FuncParameterType>(loc, is_ref, base_type);
     }
-    consume(LEFT_BRACE, "[Cat-Lang] Expect '{' before class body.");
-
-    vector<shared_ptr<Function>> methods;
-    vector<shared_ptr<Stmt>> classStatements;
-
-    while (!check(RIGHT_BRACE) && !isAtEnd()) {
-        while (match({VAR})) {
-            classStatements.push_back(std::dynamic_pointer_cast<Var>(varDeclaration()));
-        }
-        methods.push_back(function("method"));
-        classStatements.push_back(methods.back());
+    return make_unique<FuncParameterType>(loc, is_ref, base_type, std::move(dims));
+}
+uptr<VarDef> Parser::parseVarDef() {
+    auto loc = currentLocation();
+    consume(VAR, "Expect var to delcare variable.");
+    vec<string> names;
+    Token token = consume(IDENTIFIER, "Expect variable name.");
+    names.push_back(token.lexeme);
+    while (match({COMMA})) {
+        Token else_token = consume(IDENTIFIER, "Expect variable name.");
+        names.push_back(else_token.lexeme);
     }
-    auto body = std::make_shared<Block>(classStatements);
-    consume(RIGHT_BRACE, "[Cat-Lang] Expect '}' after class body.");
+    consume(COLON, "Expect ':' to delcare variable type.");
+    auto type = parseType();
 
-    auto class_decl = std::make_shared<Class>(identifier, superclass, methods, body);
-    return class_decl;
-}
-
-shared_ptr<Stmt> Parser::statement() {
-    if (match({FOR}))
-        return forStatement();
-    if (match({IF}))
-        return ifStatement();
-    if (match({PRINT}))
-        return printStatement();
-    if (match({RETURN}))
-        return returnStatement();
-    if (match({WHILE}))
-        return whileStatement();
-    // TODO
-    // if (match({BREAK, CONTINUE}))
-    //     return controlStatement();
-    // if (match({TRY}))
-    //     return tryStatement();
-    // if (match({THROW}))
-    //     return throwStatement();
-    if (match({LEFT_BRACE}))
-        return std::make_shared<Block>(block());
-    return expressionStatement();
-}
-
-/// @brief parse an expression statement
-/// @return
-shared_ptr<Stmt> Parser::expressionStatement() {
-    shared_ptr<Expr<Object>> expr = expression();
-    consume(SEMICOLON, "[Cat-Lang] Expect ';' after expression.");
-    return std::make_shared<Expression>(expr);
-}
-
-/// @brief parse a for statement, like for(...)
-/// @return
-shared_ptr<Stmt> Parser::forStatement() {
-    consume(LEFT_PAREN, "[Cat-Lang] Expect '(' after 'for'.");
-    shared_ptr<Stmt> initializer;
-    if (match({SEMICOLON}))
-        initializer = nullptr;
-    else if (match({VAR}))
-        initializer = varDeclaration();
-    else
-        initializer = expressionStatement();
-
-    shared_ptr<Expr<Object>> condition =
-        !check(SEMICOLON) ? assignment() : nullptr;
-    consume(SEMICOLON, "[Cat-Lang] Expect ';' after loop condition.");
-
-    shared_ptr<Expr<Object>> increment =
-        !check(RIGHT_PAREN) ? assignment() : nullptr;
-    consume(RIGHT_PAREN, "[Cat-Lang] Expect ')' after for clauses.");
-
-    shared_ptr<Stmt> body = statement();
-
-    if (increment != nullptr) {
-        vector<shared_ptr<Stmt>> stmts;
-        stmts.emplace_back(body);
-        stmts.emplace_back(std::make_shared<Expression>(increment));
-        // stmts.emplace_back(shared_ptr<Stmt>(new Expression(increment)));
-        body = std::make_shared<Block>(stmts);
-    }
-
-    if (condition == nullptr) {
-        condition = std::make_shared<Literal<Object>>(Object::make_obj(true));
-    }
-    body = std::make_shared<While>(condition, body);
-
-    if (initializer != nullptr) {
-        vector<shared_ptr<Stmt>> stmts2;
-        stmts2.emplace_back(initializer);
-        stmts2.emplace_back(body);
-        body = std::make_shared<Block>(stmts2);
-    }
-
-    return body;
-}
-
-/// @brief parse a if statement, like if(...)
-/// @return
-shared_ptr<Stmt> Parser::ifStatement() {
-    consume(LEFT_PAREN, "[Cat-Lang] Expect '(' after 'if'.");
-    shared_ptr<Expr<Object>> if_condition = expression();
-    consume(RIGHT_PAREN, "[Cat-Lang] Expect ')' after if condition.");
-    shared_ptr<Stmt> then_branch = statement();
-    IfBranch main_brach{std::move(if_condition), std::move(then_branch)};
-    vector<IfBranch> elif_branches;
-    while (match({ELIF})) {
-        consume(LEFT_PAREN, "[Cat-Lang] Expect '(' after 'elif'.");
-        auto elif_condition = assignment();
-        consume(RIGHT_PAREN, "[Cat-Lang] Expect ')' after elif condition.");
-        auto elif_branch = statement();
-        elif_branches.emplace_back(std::move(elif_condition), std::move(elif_branch));
-    }
-    auto else_branch = match({ELSE}) ? statement() : nullptr;
-
-    return std::make_shared<If>(main_brach, elif_branches, else_branch);
-    // return shared_ptr<Stmt>(new If(main_brach, elif_branches, else_branch));
-}
-
-/// @brief parse a print statement, like print(...)
-/// @return
-shared_ptr<Stmt> Parser::printStatement() {
-    // ! deperate usage, this didn't view print as a function
-    // shared_ptr<Expr<Object>> value = expression();
-    // consume(SEMICOLON, "Expect ';' after value.");
-    // shared_ptr<Stmt> print(new Print(value));
-    // return print;
-    Token identifier = previous();
-    if (!match({LEFT_PAREN})) {
-        throw error(identifier, "[Cat-Lang] Expect '(' after 'print'.");
-    }
-    auto expr = finishCall(std::make_shared<Variable<Object>>(identifier));
-    consume(SEMICOLON, "[Cat-Lang] Expect ';' after value.");
-    return std::make_shared<Print>(expr);
-}
-
-/// @brief parse a return statement
-/// @return
-shared_ptr<Stmt> Parser::returnStatement() {
-    Token keyword = previous();
-    auto value = check(TokenType::SEMICOLON) ? nullptr : expression();
-    consume(SEMICOLON, "[Cat-Lang] Expect ';' after return value.");
-    return std::make_shared<Return>(keyword, value);
-}
-
-/// @brief parse a while statement, like while(...)
-/// @return
-shared_ptr<Stmt> Parser::whileStatement() {
-    consume(LEFT_PAREN, "[Cat-Lang] Expect '(' after 'while'.");
-    shared_ptr<Expr<Object>> condition = expression();
-    consume(RIGHT_PAREN, "[Cat-Lang] Expect ')' after condition.");
-    shared_ptr<Stmt> body = statement();
-    return std::make_shared<While>(condition, body);
-}
-
-/// @brief parse a control statement, like {breal; continue}
-/// @return
-// shared_ptr<Stmt> Parser::controlStatement() {
-//     Token keyword = previous();
-//     if (keyword.type == BREAK) {
-//         consume(SEMICOLON, "[Cat-Lang] [Cat-Lang] Expect ';' after 'break'.");
-//         return std::make_shared<Break>(keyword);
-//     } else if (keyword.type == CONTINUE) {
-//         consume(SEMICOLON, "[Cat-Lang] [Cat-Lang] Expect ';' after 'continue'.");
-//         return std::make_shared<Continue>(keyword);
-//     }
-//     return nullptr;
-// }
-
-/// @brief parse a try statement, like try{...}
-/// @return
-// shared_ptr<Stmt> Parser::tryStatement() {
-//     // TODO
-//     return nullptr;
-// }
-
-/// @brief parse a throw statement, like throw ...
-/// @return
-// shared_ptr<Stmt> Parser::throwStatement() {
-//     // TODO
-//     return nullptr;
-// }
-
-// ==> Expr...
-
-/// @brief parse the expressions
-/// @return
-shared_ptr<Expr<Object>> Parser::expression() { return assignment(); }
-
-/// @brief parse the assignment, like a=1
-/// @return
-shared_ptr<Expr<Object>> Parser::assignment() {
-    shared_ptr<Expr<Object>> expr = orExpression();
+    // optional initialization
+    optional<uptr<Expr>> init = std::nullopt;
     if (match({EQUAL})) {
-        Token equals = previous();
-        shared_ptr<Expr<Object>> value = assignment();
-
-        if (auto subscript = dynamic_pointer_cast<Subscript<Object>>(expr);
-            subscript != nullptr) {
-            Token name = subscript->identifier;
-            return std::make_shared<Subscript<Object>>(
-                std::move(name), subscript->index, std::move(value)
-            );
-        }
-        if (auto variable = dynamic_pointer_cast<Variable<Object>>(expr);
-            variable != nullptr) {
-            Token name = variable->name;
-            return std::make_shared<Assign<Object>>(name, value);
-        }
-        if (auto get = dynamic_pointer_cast<Get<Object>>(expr); get != nullptr) {
-            return std::make_shared<Set<Object>>(get->object, get->name, value);
-        }
-        error(equals, "[Cat-Lang] Invalid assignment target.");
+        init = parseExpr();
     }
-    return expr;
-}
 
-/// @brief parse the or expression, like 1 or 2
-/// @return
-shared_ptr<Expr<Object>> Parser::orExpression() {
-    shared_ptr<Expr<Object>> expr = andExpression();
+    return make_unique<VarDef>(loc, names, std::move(type), std::move(init));
+}
+uptr<Type> Parser::parseType() {
+    auto loc = currentLocation();
+    DataType::DataType base_type = parseDataType();
+
+    vec<optional<int>> dims;
+    while (match({LEFT_BRACKET})) {
+        if (!check(RIGHT_BRACKET)) {
+            Token dim = consume(INTEGEL, "Index should be integel.");
+            dims.push_back(std::stoi(dim.lexeme));
+        } else {
+            dims.push_back(std::nullopt);
+        }
+        consume(RIGHT_BRACKET, "Expect ']'");
+    }
+
+    return make_unique<Type>(loc, base_type, std::move(dims));
+}
+DataType::DataType Parser::parseDataType() {
+    if (match({INT})) return DataType::DataType::INT;
+    if (match({BOOL})) return DataType::DataType::BOOL;
+    if (match({STR})) return DataType::DataType::STRING;
+    return DataType::DataType::UNKOWN;
+}
+uptr<Block> Parser::parseBlock() {
+    auto loc = currentLocation();
+    consume(LEFT_BRACE, "Expect '{'.");
+    vec<uptr<Stmt>> statements;
+    while (!check(RIGHT_BRACE) && !isAtEnd()) {
+        statements.push_back(parseStmt());
+    }
+    consume(RIGHT_BRACE, "Expect '}'.");
+    return make_unique<Block>(loc, std::move(statements));
+}
+uptr<Stmt> Parser::parseStmt() {
+    auto loc = currentLocation();
+    // if (match({NONE})) {
+    //     return make_unique<SkipStmt>(loc);// do nothing
+    // }
+    // if(match({EXIT})){
+    //     return make_unique<ExitStmt>(loc);
+    // }
+    if (match({RETURN})) {
+        auto expr = parseExpr();
+        return make_unique<ReturnStmt>(loc, std::move(expr));
+    }
+    if (check(IF)) {
+        return parseIfStmt();
+    }
+    if (check(WHILE)) {
+        return parseLoopStmt();
+    }
+    if (check(VAR)) {
+        return parseVarDef();
+    }
+    if (match({BREAK})) {
+        std::optional<string> label = std::nullopt;
+        if (check(IDENTIFIER)) {
+            label = peek().lexeme;
+            advance();
+        }
+        return make_unique<BreakStmt>(loc, label);
+    }
+    if (match({CONTINUE})) {
+        std::optional<string> label = std::nullopt;
+        if (check(IDENTIFIER)) {
+            label = peek().lexeme;
+            advance();
+        }
+        return make_unique<ContinueStmt>(loc, label);
+    }
+    // if (match({LEFT_BRACE})) {
+    //     return parseBlock();
+    // }
+    if (check(IDENTIFIER)) {
+        return parseAssignmentOrProcCall();
+    }
+    throw error(peek(), "Unexpected statement.");
+}
+uptr<Stmt> Parser::parseAssignmentOrProcCall() {
+    auto loc = currentLocation();
+    Token token = consume(IDENTIFIER, "Expect identifier.");
+    // assigment
+    uptr<Lval> left = make_unique<IdLVal>(token.location, token.lexeme);
+    // procedure call
+    if (match({LEFT_PAREN})) {
+        vec<uptr<Expr>> arguments;
+        if (!check(RIGHT_PAREN)) {
+            arguments = parseArguments();
+        }
+        consume(RIGHT_PAREN, "Expect ')' after arguments.");
+        return make_unique<ProcCall>(loc, token.lexeme, std::move(arguments));
+    }
+    // handling array index
+    while (match({LEFT_BRACKET})) {
+        auto index_expr = parseExpr();
+        consume(RIGHT_BRACKET, "Expect ']'");
+        left = make_unique<IndexLVal>(loc, std::move(left), std::move(index_expr));
+    }
+
+    consume(EQUAL, "Expect '=' in assignment statement.");
+    uptr<Expr> right = parseExpr();
+    return make_unique<AssignStmt>(loc, std::move(left), std::move(right));
+}
+uptr<IfStmt> Parser::parseIfStmt() {
+    Location loc = currentLocation();
+    consume(IF, "Expected 'if'");
+    consume(LEFT_PAREN, "Expect '('");
+    auto cond = parseCond();
+    consume(RIGHT_PAREN, "Expect ')'");
+    auto then_block = parseBlock();
+
+    vec<std::pair<uptr<Cond>, uptr<Block>>> elifs;
+    while (match({ELIF})) {
+        auto elif_cond = parseCond();
+        auto elif_block = parseBlock();
+        elifs.push_back({std::move(elif_cond), std::move(elif_block)});
+    }
+
+    std::optional<uptr<Block>> else_block;
+    if (match({ELSE})) {
+        else_block = parseBlock();
+    }
+
+    return std::make_unique<IfStmt>(loc, std::move(cond), std::move(then_block), std::move(elifs), std::move(else_block));
+}
+uptr<LoopStmt> Parser::parseLoopStmt() {
+    Location loc = currentLocation();
+    consume(WHILE, "Expected 'while'");
+    consume(LEFT_PAREN, "Expect '('");
+    auto cond = parseCond();
+    consume(RIGHT_PAREN, "Expect ')'");
+    auto body = parseBlock();
+    return std::make_unique<LoopStmt>(loc, std::move(cond), std::move(body));
+}
+uptr<Lval> Parser::parseLVal() {
+    Location loc = currentLocation();
+    std::unique_ptr<Lval> base;
+
+    if (match({STRING})) {
+        base = std::make_unique<StringLiteralLVal>(loc, previous().lexeme);
+    } else if (match({IDENTIFIER})) {
+        base = std::make_unique<IdLVal>(loc, previous().lexeme);
+    } else {
+        throw error(peek(), "Expected l-value");
+    }
+
+    // Handle array indexing - [ comes before ]
+    while (match({RIGHT_BRACKET})) {
+        auto index = parseExpr();
+        consume(LEFT_BRACKET, "Expected ']'");
+        base = std::make_unique<IndexLVal>(loc, std::move(base), std::move(index));
+    }
+
+    return base;
+}
+uptr<Expr> Parser::parseExpr() {
+    return parseLogicalOr();
+}
+uptr<Expr> Parser::parseLogicalOr() {
+    auto left = parseLogicalAnd();
     while (match({OR})) {
-        Token operation = previous();
-        shared_ptr<Expr<Object>> right = andExpression();
-        expr = std::make_shared<Logical<Object>>(expr, operation, right);
+        auto loc = currentLocation();
+        auto right = parseLogicalAnd();
+        left = make_unique<BinaryExpr>(loc, BinOp::OrBits, std::move(left), std::move(right));
     }
-    return expr;
+    return left;
 }
-
-/// @brief parse the and expression, like 1 and 2
-/// @return
-shared_ptr<Expr<Object>> Parser::andExpression() {
-    shared_ptr<Expr<Object>> expr = equality();
+uptr<Expr> Parser::parseLogicalAnd() {
+    auto left = parseEquality();
     while (match({AND})) {
-        Token operation = previous();
-        shared_ptr<Expr<Object>> right = equality();
-        expr = std::make_shared<Logical<Object>>(expr, operation, right);
+        Location loc = currentLocation();
+        auto right = parseEquality();
+        left = std::make_unique<BinaryExpr>(loc, BinOp::AndBits, std::move(left), std::move(right));
     }
-    return expr;
+    return left;
 }
-
-template<typename Fn>
-shared_ptr<Expr<Object>>
-Parser::binary(Fn func, const std::initializer_list<TokenType> &token_args) {
-    auto expr = func();
-    while (match(token_args)) {
-        auto op = previous();
-        auto right = func();
-        expr = std::make_shared<Binary<Object>>(expr, op, right);
+uptr<Expr> Parser::parseEquality() {
+    auto left = parseRelational();
+    while (match({EQUAL_EQUAL, BANG_EQUAL})) {
+        auto loc = currentLocation();
+        BinOp op = previous().type == EQUAL_EQUAL ? BinOp::Eq : BinOp::Ne;
+        auto right = parseRelational();
+        left = make_unique<BinaryExpr>(loc, op, std::move(left), std::move(right));
     }
-    return expr;
+    return left;
 }
-
-/// @brief parse an equality expreeion, like a!=b, a==b
-/// @return
-shared_ptr<Expr<Object>> Parser::equality() {
-    auto expr =
-        binary([this]() { return comparison(); }, {BANG_EQUAL, EQUAL_EQUAL});
-    return expr;
-}
-
-/// @brief parse a comparsion expreesion, like a<b, a<=b, a>b, a>=b
-/// @return
-shared_ptr<Expr<Object>> Parser::comparison() {
-    auto expr = binary([this]() { return term(); }, {TokenType::GREATER, TokenType::GREATER_EQUAL, TokenType::LESS, TokenType::LESS_EQUAL});
-    return expr;
-}
-
-/// @brief parse a term expression, like a+b, a-b
-/// @return
-shared_ptr<Expr<Object>> Parser::term() {
-    auto expr = binary([this]() { return factor(); }, {TokenType::MINUS, TokenType::PLUS});
-    return expr;
-}
-
-/// @brief parse factor expreesion, like a^b, a/b, a*b, a%b
-/// @return
-shared_ptr<Expr<Object>> Parser::factor() {
-    auto expr = binary([this]() { return unary(); }, {TokenType::SLASH, TokenType::BACKSLASH, TokenType::STAR, TokenType::MODULO});
-    return expr;
-}
-
-shared_ptr<Expr<Object>> Parser::unary() {
-    if (match({BANG, MINUS})) {
-        Token operation = previous();
-        shared_ptr<Expr<Object>> right = unary();
-        return std::make_shared<Unary<Object>>(operation, right);
-    }
-    // return prefix();
-    return call();
-}
-
-/// @brief parse a prefix expreesion, like ++a, --a
-/// @return
-// shared_ptr<Expr<Object>> Parser::prefix() {
-//     if (match({PLUS_PLUS, MINUS_MINUS})) {
-//         const auto op = previous();
-//         auto lvalue = consume(IDENTIFIER, "[Cat-Lang] Operators '++' and '--' "
-//                                           "must be applied to and lvalue operand.");
-
-//         if (lvalue.type == PLUS_PLUS || lvalue.type == MINUS_MINUS) {
-//             throw error(
-//                 peek(),
-//                 "[Cat-Lang] Operators '++' and '--' cannot be concatenated."
-//             );
-//         }
-
-//         if (op.type == PLUS_PLUS) {
-//             return std::make_shared<Increment<Object>>(
-//                 lvalue, Increment<Object>::Type::PREFIX
-//             );
-//         } else {
-//             return std::make_shared<Decrement<Object>>(
-//                 lvalue, Decrement<Object>::Type::PREFIX
-//             );
-//         }
-//     }
-
-//     return postfix();
-// }
-/// @brief parse a postfix expression, like a++, a--. etc.
-/// @return
-// shared_ptr<Expr<Object>> Parser::postfix() {
-//     auto expr = call();
-
-//     if (match({TokenType::PLUS_PLUS, TokenType::MINUS_MINUS})) {
-//         const auto op = previous();
-//         // Forbid incrementing/decrementing rvalues.
-//         if (!dynamic_cast<Variable<Object> *>(expr.get())) {
-//             throw error(op, "[Cat-Lang] Operators '++' and '--' must be applied "
-//                             "to and lvalue operand.");
-//         }
-
-//         // Concatenating increment/decrement operators is not allowed.
-//         if (match({TokenType::PLUS_PLUS, TokenType::MINUS_MINUS})) {
-//             throw error(
-//                 op, "[Cat-Lang] Operators '++' and '--' cannot be concatenated."
-//             );
-//         }
-
-//         if (op.type == TokenType::PLUS_PLUS) {
-//             expr = std::make_shared<Increment<Object>>(
-//                 dynamic_cast<Variable<Object> *>(expr.get())->name,
-//                 Increment<Object>::Type::POSTFIX
-//             );
-//         } else {
-//             expr = std::make_shared<Decrement<Object>>(
-//                 dynamic_cast<Variable<Object> *>(expr.get())->name,
-//                 Decrement<Object>::Type::POSTFIX
-//             );
-//         }
-//     }
-
-//     return expr;
-// }
-
-/// @brief parse a call expression, like fub()
-/// @return
-shared_ptr<Expr<Object>> Parser::call() {
-    shared_ptr<Expr<Object>> expr = subscript();
-    while (true) {
-        if (match({LEFT_PAREN})) {
-            expr = finishCall(expr);
-        } else if (match({DOT})) {
-            Token name =
-                consume(IDENTIFIER, "[Cat-Lang] Expect property name after '.'.");
-            expr = std::make_shared<Get<Object>>(expr, name);
-        } else {
-            break;
+uptr<Expr> Parser::parseRelational() {
+    auto left = parseAdditive();
+    if (match({LESS, GREATER, LESS_EQUAL, GREATER_EQUAL})) {
+        Location loc = currentLocation();
+        BinOp op;
+        Token token = previous();
+        switch (token.type) {
+            case LESS:
+                op = BinOp::Lt;
+                break;
+            case GREATER:
+                op = BinOp::Gt;
+                break;
+            case LESS_EQUAL:
+                op = BinOp::Le;
+                break;
+            case GREATER_EQUAL:
+                op = BinOp::Ge;
+                break;
+            default:
+                throw error(token, "Invalid relational operator.");
         }
+        auto right = parseAdditive();
+        left = std::make_unique<BinaryExpr>(loc, op, std::move(left), std::move(right));
     }
-    return expr;
+    return left;
 }
-
-/// @brief finish parsing a call exapression
-/// @param expr callee
-/// @return
-shared_ptr<Expr<Object>> Parser::finishCall(shared_ptr<Expr<Object>> callee) {
-    vector<shared_ptr<Expr<Object>>> arguments;
-    if (!check(RIGHT_PAREN)) {
-        do {
-            if (arguments.size() >= 255) {
-                error(peek(), "[Cat-Lang] Cannot have more than 255 arguments.");
-            }
-            arguments.push_back(expression());
-        } while (match({COMMA}));
-    }
-
-    Token paren =
-        consume(RIGHT_PAREN, "[Cat-Lang] Expect ')' after arguments.");
-
-    return std::make_shared<Call<Object>>(callee, paren, arguments);
-}
-
-/// @brief parse a subscript expression, like a[][]
-/// @return
-shared_ptr<Expr<Object>> Parser::subscript() {
-    shared_ptr<Expr<Object>> expr = primary();
+uptr<Expr> Parser::parseAdditive() {
+    auto left = parseMultiplicative();
     while (true) {
-        if (match({LEFT_BRACKET})) {
-            expr = finishSubscript(expr);
-        } else {
+        Location loc = currentLocation();
+        BinOp op;
+        if (match({PLUS}))
+            op = BinOp::Add;
+        else if (match({MINUS}))
+            op = BinOp::Sub;
+        else
             break;
-        }
-    }
-    return expr;
-}
 
-/// @brief finih parsing, that is implement
-/// @param expr
-/// @return
-shared_ptr<Expr<Object>>
-Parser::finishSubscript(shared_ptr<Expr<Object>> identifier) {
-    auto index = orExpression();
-    consume(TokenType::RIGHT_BRACKET, "[Cat-Lang] Expect ']' after arguments.");
-
-    // Forbid calling rvalues.
-    if (!dynamic_cast<Variable<Object> *>(identifier.get())) {
-        throw error(peek(), "[Cat-Lang] rvalue is not subscriptable.");
+        auto right = parseMultiplicative();
+        left = std::make_unique<BinaryExpr>(loc, op, std::move(left), std::move(right));
     }
 
-    auto var = dynamic_cast<Variable<Object> *>(identifier.get())->name;
-
-    return std::make_shared<Subscript<Object>>(var, index, nullptr);
+    return left;
 }
+uptr<Expr> Parser::parseMultiplicative() {
+    auto left = parseUnary();
+    while (true) {
+        Location loc = currentLocation();
+        BinOp op;
+        if (match({STAR})) op = BinOp::Mul;
+        else if (match({SLASH}))
+            op = BinOp::Div;
+        else if (match({MODULO}))
+            op = BinOp::Mod;
+        else
+            break;
 
-/// @brief parse the lambda function
-/// @return
-// shared_ptr<Expr<Object>> Parser::lambda() {
-//     return nullptr;
-// }
+        auto right = parseUnary();
+        left = std::make_unique<BinaryExpr>(loc, op, std::move(left), std::move(right));
+    }
 
-/// @brief parse a primary expression
-/// @return
-shared_ptr<Expr<Object>> Parser::primary() {
-    if (match({FALSE})) {
-        return std::make_shared<Literal<Object>>(Object::make_obj(false));
+    return left;
+}
+uptr<Expr> Parser::parseUnary() {
+    Location loc = currentLocation();
+
+    if (match({PLUS})) {
+        return std::make_unique<UnaryExpr>(loc, UnOp::Plus, parseUnary());
+    }
+    if (match({MINUS})) {
+        return std::make_unique<UnaryExpr>(loc, UnOp::Minus, parseUnary());
+    }
+    if (match({BANG})) {
+        return std::make_unique<UnaryExpr>(loc, UnOp::Not, parseUnary());
+    }
+
+    return parsePrimary();
+}
+uptr<Expr> Parser::parsePrimary() {
+    Location loc = currentLocation();
+
+    // Constants
+    if (match({INTEGEL})) {
+        return std::make_unique<IntConst>(loc, std::stoi(previous().lexeme));
+    }
+    // if (match({NUMBER})){
+    //     return std::make_unique<DoubleConst>(loc, std::stod(previous().lexeme));
+    // }
+    if (match({STRING})) {
+        return std::make_unique<CharConst>(loc, previous().lexeme[0]);
     }
     if (match({TRUE})) {
-        return std::make_shared<Literal<Object>>(Object::make_obj(true));
+        return std::make_unique<TrueConst>(loc);
     }
-    if (match({NONE})) {
-        return std::make_shared<Literal<Object>>(Object::make_none_obj());
+    if (match({FALSE})) {
+        return std::make_unique<FalseConst>(loc);
     }
+    // if (match({SUPER})){}
+    // if (match({SELF})) {}
 
-    if (match({NUMBER})) {
-        return std::make_shared<Literal<Object>>(
-            Object::make_obj(std::get<double>(previous().literal.data))
-        );
-    }
-    if (match({INTEGEL})) {
-        return std::make_shared<Literal<Object>>(
-            Object::make_obj(std::get<int>(previous().literal.data))
-        );
-    }
-    if (match({STRING})) {
-        return std::make_shared<Literal<Object>>(
-            Object::make_obj(std::get<std::string>(previous().literal.data))
-        );
-    }
-
-    if (match({SUPER})) {
-        // find token lexeme is class
-        // get the class name
-        int c_cur = current;
-        while (tokens[c_cur].lexeme != "class") {
-            c_cur--;
-        }
-        Token className = tokens[c_cur + 1];
-        Token keyword = previous();
-        consume(DOT, "[Cat-Lang] Expect '.' after 'super'.");
-        Token method =
-            consume(IDENTIFIER, "[Cat-Lang] Expect superclass method name.");
-        return std::make_shared<Super<Object>>(keyword, className, method);
-    }
-
-    if (match({SELF})) {
-        return std::make_shared<Self<Object>>(previous());
-    }
-
-    if (match({IDENTIFIER})) {
-        return std::make_shared<Variable<Object>>(previous());
-    }
-
+    // Parenthesized expression
     if (match({LEFT_PAREN})) {
-        shared_ptr<Expr<Object>> expr = expression();
-        consume(RIGHT_PAREN, "[Cat-Lang] Expect ')' after expression.");
-        return std::make_shared<Grouping<Object>>(expr);
+        auto expr = parseExpr();
+        consume(RIGHT_PAREN, "Expected ')'");
+        return std::make_unique<ParenExpr>(loc, std::move(expr));
     }
 
-    if (match({LEFT_BRACKET})) {
-        Token opening_bracket = previous();
-        auto expr = list();
-        consume(RIGHT_BRACKET, "[Cat-Lang] Expect ']' at the end of a list");
-        return std::make_shared<List<Object>>(opening_bracket, expr);
+    // Function call or l-value
+    if (check(IDENTIFIER)) {
+        Token token = advance();
+
+        // Check if it's a function call
+        if (match({LEFT_PAREN})) {
+            auto args = parseArguments();
+            consume(RIGHT_PAREN, "Expected ')'");
+            return std::make_unique<FuncCall>(loc, token.lexeme, std::move(args));
+        }
+
+        // It's an l-value, possibly with indexing
+        uptr<Lval> lval;
+        lval = std::make_unique<IdLVal>(loc, token.lexeme);
+
+        // Handle array indexing
+        while (match({RIGHT_BRACKET})) {
+            auto index = parseExpr();
+            consume(LEFT_BRACKET, "Expected ']'");
+            lval = std::make_unique<IndexLVal>(loc, std::move(lval), std::move(index));
+        }
+
+        return std::make_unique<LValueExpr>(loc, std::move(lval));
     }
-    throw error(peek(), "[Cat-Lang] Expect expression.");
+
+    // String literal as l-value
+    if (check(STRING)) {
+        auto lval = parseLVal();
+        return std::make_unique<LValueExpr>(loc, std::move(lval));
+    }
+
+    throw error(peek(), "Expected expression");
 }
+vec<uptr<Expr>> Parser::parseArguments() {
+    vec<uptr<Expr>> args;
 
-/// @brief parse a list expression, a = []
-/// @return
-vector<shared_ptr<Expr<Object>>> Parser::list() {
-    vector<shared_ptr<Expr<Object>>> items;
-    // Return an empty list if there are no values.
-    if (check(RIGHT_BRACKET))
-        return items;
-    do {
-        if (check(RIGHT_BRACKET))
-            break;
+    if (!check(RIGHT_PAREN)) {
+        do {
+            args.push_back(parseExpr());
+        } while (match({COMMA}));
+    }
 
-        items.emplace_back(orExpression());
-
-        if (items.size() > 100)
-            error(peek(), "[Cat-Lang] Cannot have more than 100 items in a list.");
-
-    } while (match({COMMA}));
-
-    return items;
+    return args;
 }
+uptr<Cond> Parser::parseCond() {
+    auto expr = parseExpr();
+    return make_unique<ExprCond>(expr->loc, std::move(expr));
+}
+// uptr<Cond> Parser::parseLogicalOrCond() {
+//     auto left = parseLogicalAndCond();
+
+//     while (match({OR})) {
+//         Location loc = currentLocation();
+//         auto right = parseLogicalAndCond();
+//         left = std::make_unique<BinaryCond>(loc, LogicOp::Or, std::move(left), std::move(right));
+//     }
+
+//     return left;
+// }
+// uptr<Cond> Parser::parseLogicalAndCond() {
+//     auto left = parseUnaryCond();
+
+//     while (match({AND})) {
+//         Location loc = currentLocation();
+//         auto right = parseUnaryCond();
+//         left = std::make_unique<BinaryCond>(loc, LogicOp::And, std::move(left), std::move(right));
+//     }
+
+//     return left;
+// }
+// uptr<Cond> Parser::parseUnaryCond() {
+//     Location loc = currentLocation();
+
+//     if (match({BANG})) {
+//         return std::make_unique<NotCond>(loc, parseUnaryCond());
+//     }
+
+//     return parsePrimaryCond();
+// }
+// uptr<Cond> Parser::parsePrimaryCond() {
+//     Location loc = currentLocation();
+
+//     if (match({LEFT_PAREN})) {
+//         auto cond = parseCond();
+//         consume(RIGHT_PAREN, "Expected ')'");
+//         return std::make_unique<ParenCond>(loc, std::move(cond));
+//     }
+
+//     auto left = parseExpr();
+
+//     return std::make_unique<ExprCond>(loc, std::move(left));
+// }
 
 // helper functions...
 
 /// @brief get the previous token
 /// @return  previous token
-Token Parser::previous() { return tokens[current - 1]; }
+Token Parser::previous() const { return lastToken; }
 
 // ? return the reference of current token?
 /// @brief get the current token
 /// @return  current token
-Token Parser::peek() { return tokens[current]; }
+Token Parser::peek() const { return currentToken; }
 
 /// @brief check if the parser is at the end of tokens
 /// @return
@@ -719,7 +575,8 @@ bool Parser::isAtEnd() { return peek().type == TOKEN_EOF; }
 /// @return current token
 Token Parser::advance() {
     if (!isAtEnd()) {
-        current++;
+        lastToken = currentToken;
+        currentToken = scanner.scanToken();
     }
     return previous();
 }
@@ -755,16 +612,23 @@ Token Parser::consume(TokenType type, string message) {
     if (check(type))
         return advance();
     // DIE << message;
-    throw error(peek(), message);
+    auto diag = cat::getGlobalDiagnostics();
+    if (diag) {
+        diag->report(Diagnostics::Severity::Error, Diagnostics::Phase::Parsing, currentLocation(), message);
+    }
+    throw std::runtime_error("Parsing failed");
+}
+
+Location Parser::currentLocation() const {
+    return peek().location;
 }
 
 // error handle function and recovery
 runtime_error Parser::error(Token token, string message) {
-    Error::addError(token, std::move(message));
     if (token.type == TOKEN_EOF) {
-        return runtime_error(to_string(token.line) + " at end" + message);
+        return runtime_error(to_string(token.location.line) + " at end" + message);
     } else {
-        return runtime_error(to_string(token.line) + " at '" + token.lexeme + "'" + message);
+        return runtime_error(to_string(token.location.line) + " at '" + token.lexeme + "'" + message);
     }
 }
 
@@ -780,7 +644,6 @@ void Parser::synchronize() {
             case FOR:
             case IF:
             case WHILE:
-            case PRINT:
             case RETURN:
             case BREAK:
                 return;

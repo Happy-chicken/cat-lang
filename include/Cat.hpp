@@ -16,8 +16,8 @@ public:
     // ---------------------------------------
     // run the program
     // ---------------------------------------
-    void run(const std::string &program);
-    void runFile(std::string path);
+    // void run(const std::string &program);
+    // void runFile(std::string path);
     // ---------------------------------------
     // read file
     // ---------------------------------------

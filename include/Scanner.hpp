@@ -2,7 +2,6 @@
 #define SCANNER_HPP_
 
 #include "Token.hpp"
-#include <map>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -13,21 +12,18 @@ using std::vector;
 class Scanner {
 private:
     string source;
-    vector<Token> tokens;
     static const unordered_map<string, TokenType> keywords;
     size_t start = 0;
     size_t current = 0;
     int line = 1;
     int column = 1;
-    void scanToken();
     char advance();
-    void addToken(TokenType type);
-    void addToken(TokenType type, Object literal);
+    Token makeToken(TokenType type);
     bool match(char expected);
 
-    void String();
-    void Number();
-    void identifier();
+    Token String();
+    Token Number();
+    Token identifier();
 
     char peek() const;
     char peekNext() const;
@@ -38,7 +34,8 @@ private:
 
 public:
     explicit Scanner(string source);
-    vector<Token> scanTokens();
+    Token scanToken();
+    //vector<Token> scanTokens();
 };
 
 #endif// SCANNER_HPP_

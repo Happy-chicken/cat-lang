@@ -7,71 +7,72 @@
 #include <string>
 #include <vector>
 
-#include "Expr.hpp"
-#include "Stmt.hpp"
+#include "AST.hpp"
+#include "Location.hpp"
+#include "Scanner.hpp"
 
 using std::initializer_list;
 using std::runtime_error;
-using std::shared_ptr;
 using std::string;
+template<typename T>
+using uptr = std::unique_ptr<T>;
+template<typename T>
+using sptr = std::shared_ptr<T>;
 using std::vector;
 
 class Parser {
 public:
-    explicit Parser(vector<Token> tokens_) : tokens(tokens_) {}
-    vector<shared_ptr<Stmt>> parse();
+    explicit Parser(Scanner &scanner_) : scanner(scanner_) {}
+    sptr<Program> parse();
 
 private:
-    vector<Token> tokens;
-    int current = 0;
+    Scanner &scanner;
+    Token currentToken;
+    Token lastToken;
 
 private:
-    shared_ptr<Expr<Object>> assignment();
-    shared_ptr<Expr<Object>> orExpression();
-    shared_ptr<Expr<Object>> andExpression();
-    shared_ptr<Expr<Object>> expression();
-    template<typename Fn>
-    shared_ptr<Expr<Object>>
-    binary(Fn func, const std::initializer_list<TokenType> &token_args);
-    shared_ptr<Expr<Object>> equality();
-    shared_ptr<Expr<Object>> comparison();
-    shared_ptr<Expr<Object>> term();
-    shared_ptr<Expr<Object>> factor();
-    shared_ptr<Expr<Object>> unary();
-    // shared_ptr<Expr<Object>> prefix();
-    // shared_ptr<Expr<Object>> postfix();
-    // shared_ptr<Expr<Object>> lambda();
-    std::vector<shared_ptr<Expr<Object>>> list();
-    shared_ptr<Expr<Object>> subscript();
-    shared_ptr<Expr<Object>> finishSubscript(shared_ptr<Expr<Object>> identifier);
-    shared_ptr<Expr<Object>> finishCall(shared_ptr<Expr<Object>> callee);
-    shared_ptr<Expr<Object>> call();
-    shared_ptr<Expr<Object>> primary();
+    uptr<Def> parseDeclarations();
+    uptr<FuncDef> parseFuncDef();
+    uptr<Header> parseHeader();
+    vector<uptr<FuncParameterDef>> parseParameters();
+    uptr<FuncParameterDef> parseFuncParameterDef();
+    uptr<FuncParameterType> parseFuncParameterType(bool is_ref);
+    uptr<VarDef> parseVarDef();
+    uptr<ClassDef> parseClassDef();
+    uptr<Type> parseType();
+    DataType::DataType parseDataType();
+    uptr<Block> parseBlock();
+    uptr<Stmt> parseStmt();
+    uptr<Stmt> parseAssignmentOrProcCall();
+    uptr<IfStmt> parseIfStmt();
+    uptr<LoopStmt> parseLoopStmt();
+    uptr<Lval> parseLVal();
+    uptr<Expr> parseExpr();
+    uptr<Expr> parseLogicalOr();
+    uptr<Expr> parseLogicalAnd();
+    uptr<Expr> parseEquality();
+    uptr<Expr> parseRelational();
+    uptr<Expr> parseAdditive();
+    uptr<Expr> parseMultiplicative();
+    uptr<Expr> parseUnary();
+    uptr<Expr> parsePrimary();
+    std::vector<uptr<Expr>> parseArguments();
+    uptr<Cond> parseCond();
+    // uptr<Cond> parseLogicalOrCond();
+    // uptr<Cond> parseLogicalAndCond();
+    // uptr<Cond> parseUnaryCond();
+    // uptr<Cond> parsePrimaryCond();
 
-    vector<shared_ptr<Stmt>> block();
-    shared_ptr<Stmt> declaration();
-    shared_ptr<Stmt> classDeclaration();
-    shared_ptr<Stmt> varDeclaration();
-    shared_ptr<Function> function(string kind);
-    shared_ptr<Stmt> statement();
-    shared_ptr<Stmt> forStatement();
-    shared_ptr<Stmt> ifStatement();
-    shared_ptr<Stmt> whileStatement();
-    shared_ptr<Stmt> printStatement();
-    shared_ptr<Stmt> returnStatement();
-    // shared_ptr<Stmt> controlStatement();
-    shared_ptr<Stmt> expressionStatement();
-    // shared_ptr<Stmt> tryStatement();
-    // shared_ptr<Stmt> throwStatement();
 
-    shared_ptr<VarType> parseVarType();// parse nested list
+    // helper functions
     bool match(const initializer_list<TokenType> &types);
     bool check(TokenType type);
     Token advance();
     bool isAtEnd();
-    Token peek();
-    Token previous();
+    Token peek() const;
+    Token previous() const;
     Token consume(TokenType type, string message);
+    Location currentLocation() const;
     runtime_error error(Token token, string message);
     void synchronize();
 };

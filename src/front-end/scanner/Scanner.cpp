@@ -1,12 +1,14 @@
+#include <cassert>
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
 #include <string>
-#include <vector>
 
-#include "Logger.hpp"
+#include "Diagnostics.hpp"
 #include "Scanner.hpp"
 #include "Token.hpp"
-
+#include <stdexcept>
 using std::string;
-using std::vector;
 
 const unordered_map<string, TokenType> Scanner::keywords = {
     {"and", AND},
@@ -29,7 +31,7 @@ const unordered_map<string, TokenType> Scanner::keywords = {
 
     {"none", NONE},
 
-    {"print", PRINT},
+    {"ref", REF},
     {"return", RETURN},
 
     {"break", BREAK},
@@ -48,16 +50,16 @@ const unordered_map<string, TokenType> Scanner::keywords = {
 
 Scanner::Scanner(string source) : source(std::move(source)) {}
 
-vector<Token> Scanner::scanTokens() {
-    while (!isAtEnd()) {
-        // We are at the beginning of the next lexeme.
-        start = current;
-        scanToken();
-    }
+// vector<Token> Scanner::scanTokens() {
+//     while (!isAtEnd()) {
+//         // We are at the beginning of the next lexeme.
+//         start = current;
+//         scanToken();
+//     }
 
-    tokens.emplace_back(TOKEN_EOF, "", Object::make_obj(""), line, column);
-    return tokens;
-}
+//     tokens.emplace_back(TOKEN_EOF, "", Object::make_obj(""), line, column);
+//     return tokens;
+// }
 
 // helper function
 inline bool Scanner::isAtEnd() const { return current >= source.size(); }
@@ -84,11 +86,10 @@ char Scanner::advance() {
     return source.at(current - 1);
 }
 
-void Scanner::addToken(TokenType type) { addToken(type, Object::make_obj("")); }
-
-void Scanner::addToken(TokenType type, Object literal) {
+Token Scanner::makeToken(TokenType type) {
     string text = source.substr(start, current - start);
-    tokens.emplace_back(type, text, literal, line, column);
+    start = current;
+    return Token(type, text, line, column);
 }
 
 bool Scanner::match(char expected) {
@@ -101,123 +102,137 @@ bool Scanner::match(char expected) {
     return true;
 }
 
-void Scanner::scanToken() {
-    char c = advance();
+Token Scanner::scanToken() {
+    while (true) {
+        if (isAtEnd()) {
+            return makeToken(TOKEN_EOF);
+        }
 
-    switch (c) {
-        case '(':
-            addToken(LEFT_PAREN);
-            break;
-        case ')':
-            addToken(RIGHT_PAREN);
-            break;
-        case '{':
-            addToken(LEFT_BRACE);
-            break;
-        case '}':
-            addToken(RIGHT_BRACE);
-            break;
-        case '[':
-            addToken(LEFT_BRACKET);
-            break;
-        case ']':
-            addToken(RIGHT_BRACKET);
-            break;
-        case ',':
-            addToken(COMMA);
-            break;
-        case '.':
-            addToken(DOT);
-            break;
-        case '-': {
-            if (match('>')) {
-                addToken(ARROW);
-            } else if (match('-')) {
-                addToken(MINUS_MINUS);
-            } else {
-                addToken(MINUS);
-            }
-            break;
-        }
-        case '+':
-            addToken(match('+') ? PLUS_PLUS : PLUS);
-            break;
-        case ':':
-            addToken(COLON);
-            break;
-        case ';':
-            addToken(SEMICOLON);
-            break;
-        case '*':
-            addToken(STAR);
-            break;
-        case '^':
-            addToken(CARAT);
-            break;
-        case '%':
-            addToken(MODULO);
-            break;
-        case '\\':
-            addToken(BACKSLASH);
-            break;
-        case '!':
-            addToken(match('=') ? BANG_EQUAL : BANG);
-            break;
-        case '=':
-            addToken(match('=') ? EQUAL_EQUAL : EQUAL);
-            break;
-        case '<':
-            addToken(match('=') ? LESS_EQUAL : LESS);
-            break;
-        case '>':
-            addToken(match('=') ? GREATER_EQUAL : GREATER);
-            break;
-        case '/':
-            if (match('/')) {
-                // A comment goes until the end of the line.
-                while (peek() != '\n' && !isAtEnd())
-                    advance();
-            }// TODO multi-comments/**/
-            else if (match('*')) {
-                while (!(peek() == '*' && peekNext() == '/') && !isAtEnd()) {
-                    if (peek() == '\n') {
-                        line++;
-                        column = 1;
-                    }
-                    advance();
+        char c = advance();
+        Token token{TOKEN_EOF, "", -1, -1};
+        switch (c) {
+            case '(':
+                token = makeToken(LEFT_PAREN);
+                break;
+            case ')':
+                token = makeToken(RIGHT_PAREN);
+                break;
+            case '{':
+                token = makeToken(LEFT_BRACE);
+                break;
+            case '}':
+                token = makeToken(RIGHT_BRACE);
+                break;
+            case '[':
+                token = makeToken(LEFT_BRACKET);
+                break;
+            case ']':
+                token = makeToken(RIGHT_BRACKET);
+                break;
+            case ',':
+                token = makeToken(COMMA);
+                break;
+            case '.':
+                token = makeToken(DOT);
+                break;
+            case '-': {
+                if (match('>')) {
+                    token = makeToken(ARROW);
+                } else if (match('-')) {
+                    token = makeToken(MINUS_MINUS);
+                } else {
+                    token = makeToken(MINUS);
                 }
-                current += 2;// skip the close token, */
-            } else {
-                addToken(SLASH);
+                break;
             }
-            break;
-        case ' ':
-        case '\0':
-        case '\r':
-        case '\t':
-            // Ignore whitespace.
-            break;
-        case '\n': {
-            line++;
-            column = 1;
-            break;
+            case '+':
+                token = makeToken(match('+') ? PLUS_PLUS : PLUS);
+                break;
+            case ':':
+                token = makeToken(COLON);
+                break;
+            case ';':
+                token = makeToken(SEMICOLON);
+                break;
+            case '*':
+                token = makeToken(STAR);
+                break;
+            case '^':
+                token = makeToken(CARAT);
+                break;
+            case '%':
+                token = makeToken(MODULO);
+                break;
+            case '\\':
+                token = makeToken(BACKSLASH);
+                break;
+            case '!':
+                token = makeToken(match('=') ? BANG_EQUAL : BANG);
+                break;
+            case '=':
+                token = makeToken(match('=') ? EQUAL_EQUAL : EQUAL);
+                break;
+            case '<':
+                token = makeToken(match('=') ? LESS_EQUAL : LESS);
+                break;
+            case '>':
+                token = makeToken(match('=') ? GREATER_EQUAL : GREATER);
+                break;
+            case '/':
+                if (match('/')) {
+                    // A comment goes until the end of the line.
+                    while (peek() != '\n' && !isAtEnd())
+                        advance();
+                }// TODO multi-comments/**/
+                else if (match('*')) {
+                    while (!(peek() == '*' && peekNext() == '/') && !isAtEnd()) {
+                        if (peek() == '\n') {
+                            line++;
+                            column = 1;
+                        }
+                        advance();
+                    }
+                    current += 2;// skip the close token, */
+                } else {
+                    token = makeToken(SLASH);
+                }
+                break;
+            case ' ':
+            case '\0':
+            case '\r':
+            case '\t':
+                start++;
+                // Ignore whitespace.
+                continue;
+            case '\n': {
+                line++;
+                column = 1;
+                start++;
+                // break;
+                continue;
+            }
+            case '"':
+                token = String();
+                break;
+            default:
+                if (isDigit(c)) {
+                    token = Number();
+                } else if (isAlpha(c)) {
+                    token = identifier();
+                } else {
+                    auto Diagnostic = cat::getGlobalDiagnostics();
+                    if (Diagnostic) {
+                        Diagnostic->report(Diagnostics::Severity::Error, Diagnostics::Phase::Lexing, Location{line, column}, "Unexpected character '" + std::string(1, c) + "'.");
+                    }
+                }
+                break;
         }
-        case '"':
-            String();
-            break;
-        default:
-            if (isDigit(c)) {
-                Number();
-            } else if (isAlpha(c)) {
-                identifier();
-            } else {
-                Error::addError(line, column, "", "Unexpected character '" + std::to_string(c) + "'.");
-            }
-            break;
+
+        return token;
     }
 }
 
-void Scanner::String() {
+Token Scanner::String() {
     while (peek() != '"' && !isAtEnd()) {
         if (peek() == '\n') {
             line++;
@@ -228,8 +243,11 @@ void Scanner::String() {
 
     // Unterminated string.
     if (isAtEnd()) {
-        Error::addError(line, column, "", "Unterminated string.");
-        return;
+        auto diag = cat::getGlobalDiagnostics();
+        if (diag) {
+            diag->report(Diagnostics::Severity::Error, Diagnostics::Phase::Lexing, Location{line, column}, "Unterminated string.");
+            throw std::runtime_error("Lexing failed");
+        }
     }
 
     // The closing ".
@@ -237,10 +255,10 @@ void Scanner::String() {
 
     // Trim the surrounding quotes.
     string value = source.substr(start + 1, current - start - 2);
-    addToken(STRING, Object::make_obj(value));
+    return makeToken(STRING);
 }
 
-void Scanner::Number() {
+Token Scanner::Number() {
     while (isDigit(peek()))
         advance();
     bool isInteger = true;
@@ -253,20 +271,20 @@ void Scanner::Number() {
             advance();
     }
 
-    std::string numStr = source.substr(start, current - start);
+    // std::string numStr = source.substr(start, current - start);
     if (isInteger) {
-        int num = std::stoi(numStr);
-        addToken(INTEGEL, Object::make_obj(num));
+        // int istr = std::stoi(numStr);
+        return makeToken(INTEGEL);
     } else {
-        double num = std::stod(numStr);
-        addToken(NUMBER, Object::make_obj(num));
+        // float fstr = std::stof(numStr);
+        return makeToken(NUMBER);
     }
 }
 
-void Scanner::identifier() {
+Token Scanner::identifier() {
     while (isAlphaNumeric(peek()))
         advance();
     const string text = source.substr(start, current - start);
 
-    addToken(keywords.find(text) != keywords.end() ? keywords.at(text) : IDENTIFIER);
+    return makeToken(keywords.find(text) != keywords.end() ? keywords.at(text) : IDENTIFIER);
 }
