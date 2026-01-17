@@ -1,8 +1,67 @@
 #pragma once
 #include "Location.hpp"
 #include <cstddef>
+#include <memory>
 #include <string>
 #include <vector>
+template<typename T>
+using sptr = std::shared_ptr<T>;
+
+class Symbol;
+class Scope;
+
+struct InsertResult {
+    enum class Status {
+        SUCCESS,
+        REDECLARED,
+        ERROR
+    };
+
+    Symbol *symbol = nullptr;
+    Status status = Status::ERROR;
+
+    bool isSuccess() const { return status == Status::SUCCESS; }
+    bool isRedeclared() const { return status == Status::REDECLARED; }
+    bool isError() const { return status == Status::ERROR; }
+    bool isFailed() const { return !isSuccess(); }
+
+    // factory methods
+    static InsertResult ok(Symbol *sym) {
+        return {sym, Status::SUCCESS};
+    }
+    static InsertResult redeclared(Symbol *sym) {
+        return {sym, Status::REDECLARED};
+    }
+    static InsertResult error() {
+        return {nullptr, Status::ERROR};
+    }
+
+    explicit operator bool() const {
+        return isSuccess();
+    }
+};
+
+struct LookupResult {
+    Symbol *symbol = nullptr;
+    sptr<const Scope> owner = nullptr;
+
+    bool found() const { return symbol != nullptr; }
+
+    // bool isLocal() const;
+    // bool isGlobal() const;
+
+    // factory methods
+    static LookupResult ok(Symbol *sym, sptr<const Scope> owner) {
+        return {sym, owner};
+    }
+    static LookupResult notFound() {
+        return {nullptr, nullptr};
+    }
+
+    explicit operator bool() const {
+        return found();
+    }
+};
 
 class Diagnostics {
 public:

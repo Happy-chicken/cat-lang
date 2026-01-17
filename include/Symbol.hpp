@@ -25,8 +25,10 @@ public:
     virtual ~Symbol() = default;
     const std::string &getName() const;
     SymKind getKind() const;
+
     const SemaTypePtr &getType() const;
     Location getLocation() const;
+
     FuncSymbol *definingFunc() const;
     void setDefiningFunc(FuncSymbol *f);
 

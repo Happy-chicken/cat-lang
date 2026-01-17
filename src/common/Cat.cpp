@@ -2,6 +2,7 @@
 #include "Diagnostics.hpp"
 #include "Parser.hpp"
 #include "Scanner.hpp"
+#include "SymbolTable.hpp"
 #include <fstream>
 #include <ios>
 #include <iostream>
@@ -64,19 +65,21 @@ void Cat::build(const string &program) {
         auto scanner = Scanner(program);
         // ---------------------------------------------------------------------------
         // syntax analysis
-        auto parser = std::make_unique<Parser>(scanner);
-        auto root = parser->parse();
+        auto parser = Parser(scanner);
+        auto root = parser.parse();
         root->print(std::cout);
         std::cout << "Done!\n";
-        // diagnostics.printAll();
+        // ---------------------------------------------------------------------------
+        // semantic analysis
+        // 知道变量类型，作用域，函数调用，重定义，未定义等行为
+        auto symbolTable = SymbolTable();
     } catch (const std::runtime_error &e) {
         diagnostics.printAll();
         std::cerr << "Build failed: " << e.what() << std::endl;
         return;
     }
 
-    // ---------------------------------------------------------------------------
-    // semantic analysis
+
     // auto resolver = std::make_shared<Resolver>();
     // resolver->resolve(statements);
     // if (Error::hadError) {

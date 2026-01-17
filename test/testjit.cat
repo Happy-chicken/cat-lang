@@ -15,7 +15,6 @@ def main() {
     while(!1){
     }
     var a:A = A()
-    var b{}
     
     
 }

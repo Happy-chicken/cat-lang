@@ -9,6 +9,8 @@ class SemaType {
 public:
     enum class TypeKind {
         INT,
+        CHAR,
+        BOOL,
         BYTE,
         STR,
         ARRAY,
