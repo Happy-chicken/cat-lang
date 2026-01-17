@@ -5,8 +5,10 @@ namespace DataType {
         INT,
         FLOAT,
         BOOL,
+        CHAR,
         VOID,
         STRING,
+        BYTE,
         CLASS,
         UNKOWN
     };

@@ -26,6 +26,7 @@ const unordered_map<string, TokenType> Scanner::keywords = {
     {"for", FOR},
     {"while", WHILE},
 
+    {"decl", DECL},
     {"def", DEF},
     {"var", VAR},
 

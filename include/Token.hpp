@@ -54,6 +54,7 @@ typedef enum {
     ELSE,
     ELIF,
     // declare
+    DECL,
     DEF,
     VAR,
     // return

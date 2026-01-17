@@ -1,6 +1,8 @@
 // comment
-def main() {
-    var a:A = A()
-    var b:int = fun()
+decl fun()
+def fun(a:int){
+
+}
+def main() { 
     
 }

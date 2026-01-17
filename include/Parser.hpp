@@ -32,6 +32,7 @@ private:
 
 private:
     uptr<Def> parseDeclarations();
+    uptr<FuncDecl> parseFuncDecl();
     uptr<FuncDef> parseFuncDef();
     uptr<Header> parseHeader();
     vector<uptr<FuncParameterDef>> parseParameters();

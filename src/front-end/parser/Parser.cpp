@@ -18,7 +18,6 @@
 using std::initializer_list;
 using std::make_shared;
 using std::runtime_error;
-using std::to_string;
 
 
 sptr<Program> Parser::parse() {
@@ -35,6 +34,8 @@ sptr<Program> Parser::parse() {
 uptr<Def> Parser::parseDeclarations() {
     if (check(DEF)) {
         return parseFuncDef();
+    } else if (check(DECL)) {
+        return parseFuncDecl();
     } else if (check(CLASS)) {
         return parseClassDef();
     }
@@ -45,6 +46,12 @@ uptr<Def> Parser::parseDeclarations() {
     else {
         throw error(peek(), "Expect 'def', 'class' or 'var' to declare function, class or variable.");
     }
+}
+
+uptr<FuncDecl> Parser::parseFuncDecl() {
+    Location loc = currentLocation();
+    uptr<Header> header = parseHeader();
+    return make_unique<FuncDecl>(loc, std::move(header));
 }
 
 uptr<FuncDef> Parser::parseFuncDef() {
@@ -92,22 +99,26 @@ uptr<ClassDef> Parser::parseClassDef() {
 
 uptr<Header> Parser::parseHeader() {
     auto loc = currentLocation();
-    consume(DEF, "Expected 'def' keyword at the beginning of function declaration.");
-    auto token = consume(IDENTIFIER, "Expected function name after 'def' keyword.");
-    string func_name = token.lexeme;
-    consume(LEFT_PAREN, "Expected '(' after function name.");
+    if (match({DEF, DECL})) {
+        auto token = consume(IDENTIFIER, "Expected function name after 'def' keyword.");
+        string func_name = token.lexeme;
+        consume(LEFT_PAREN, "Expected '(' after function name.");
 
-    vec<uptr<FuncParameterDef>> parameters = {};
-    if (!check(RIGHT_PAREN)) {
-        parameters = parseParameters();
-    }
-    consume(RIGHT_PAREN, "Expected ')' after function parameters.");
+        vec<uptr<FuncParameterDef>> parameters = {};
+        if (!check(RIGHT_PAREN)) {
+            parameters = parseParameters();
+        }
+        consume(RIGHT_PAREN, "Expected ')' after function parameters.");
 
-    optional<DataType::DataType> return_type;
-    if (match({ARROW})) {
-        return_type = parseDataType();
+        optional<DataType::DataType> return_type;
+        if (match({ARROW})) {
+            return_type = parseDataType();
+        }
+        return make_unique<Header>(loc, std::move(func_name), std::move(return_type), std::move(parameters));
+    } else {
+        return nullptr;
+        error(peek(), "Expected 'def' or 'decl' at the beginning of function declaration.");
     }
-    return make_unique<Header>(loc, std::move(func_name), std::move(return_type), std::move(parameters));
 }
 
 vec<uptr<FuncParameterDef>> Parser::parseParameters() {

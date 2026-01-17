@@ -24,7 +24,7 @@ public:
     LookupResult lookupLocalSymbol(const string &name) const;
 
     struct FunctionFrame {
-        sptr<FuncSymbol> symbol = nullptr;
+        FuncSymbol *symbol = nullptr;
         SemaTypePtr return_type;
         bool is_procedure = false;
     };
