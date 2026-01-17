@@ -180,23 +180,28 @@ Token Scanner::scanToken() {
                 break;
             case '/':
                 if (match('/')) {
+                    start += 2;// eat 2 char '//'
                     // A comment goes until the end of the line.
-                    while (peek() != '\n' && !isAtEnd())
+                    while (peek() != '\n' && !isAtEnd()) {
                         advance();
+                        start++;
+                    }
                 }// TODO multi-comments/**/
                 else if (match('*')) {
+                    start += 2;// eat 2 char '/*'
                     while (!(peek() == '*' && peekNext() == '/') && !isAtEnd()) {
                         if (peek() == '\n') {
                             line++;
                             column = 1;
                         }
                         advance();
+                        start++;
                     }
                     current += 2;// skip the close token, */
                 } else {
                     token = makeToken(SLASH);
                 }
-                break;
+                continue;
             case ' ':
             case '\0':
             case '\r':

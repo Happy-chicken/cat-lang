@@ -7,6 +7,7 @@ namespace DataType {
         BOOL,
         VOID,
         STRING,
+        CLASS,
         UNKOWN
     };
 

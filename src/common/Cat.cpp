@@ -2,6 +2,7 @@
 #include "Diagnostics.hpp"
 #include "Parser.hpp"
 #include "Scanner.hpp"
+#include "SemanticCtx.hpp"
 #include "SymbolTable.hpp"
 #include <fstream>
 #include <ios>
@@ -73,6 +74,7 @@ void Cat::build(const string &program) {
         // semantic analysis
         // 知道变量类型，作用域，函数调用，重定义，未定义等行为
         auto symbolTable = SymbolTable();
+        auto semanticCtx = SemanticCtx(symbolTable, diagnostics);
     } catch (const std::runtime_error &e) {
         diagnostics.printAll();
         std::cerr << "Build failed: " << e.what() << std::endl;

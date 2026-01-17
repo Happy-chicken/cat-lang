@@ -190,6 +190,7 @@ DataType::DataType Parser::parseDataType() {
     if (match({INT})) return DataType::DataType::INT;
     if (match({BOOL})) return DataType::DataType::BOOL;
     if (match({STR})) return DataType::DataType::STRING;
+    if (match({IDENTIFIER})) return DataType::DataType::CLASS;
     return DataType::DataType::UNKOWN;
 }
 uptr<Block> Parser::parseBlock() {
@@ -625,11 +626,11 @@ Location Parser::currentLocation() const {
 
 // error handle function and recovery
 runtime_error Parser::error(Token token, string message) {
-    if (token.type == TOKEN_EOF) {
-        return runtime_error(to_string(token.location.line) + " at end" + message);
-    } else {
-        return runtime_error(to_string(token.location.line) + " at '" + token.lexeme + "'" + message);
+    auto diag = cat::getGlobalDiagnostics();
+    if (diag) {
+        diag->report(Diagnostics::Severity::Error, Diagnostics::Phase::Parsing, token.location, message);
     }
+    throw runtime_error("Parsing failed");
 }
 
 void Parser::synchronize() {
