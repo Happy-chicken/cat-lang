@@ -51,6 +51,9 @@ uptr<ASTNode> Parser::parseDeclarations() {
 uptr<FuncDecl> Parser::parseFuncDecl() {
     Location loc = currentLocation();
     uptr<Header> header = parseHeader();
+    if (check(LEFT_BRACE)) {
+        throw error(peek(), "Function declaration cannot have a body.");
+    }
     return make_unique<FuncDecl>(loc, std::move(header));
 }
 
@@ -295,7 +298,9 @@ uptr<IfStmt> Parser::parseIfStmt() {
 
     vec<std::pair<uptr<Cond>, uptr<Block>>> elifs;
     while (match({ELIF})) {
+        consume(LEFT_PAREN, "Expect '(' after elif.");
         auto elif_cond = parseCond();
+        consume(RIGHT_PAREN, "Expect ')' after condition.");
         auto elif_block = parseBlock();
         elifs.push_back({std::move(elif_cond), std::move(elif_block)});
     }

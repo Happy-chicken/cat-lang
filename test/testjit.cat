@@ -1,12 +1,30 @@
 // comment
-var a:int
-decl gfunc(a:int)
+//var a:int
+//decl gfunc(a:int)
+def gfunc2(param:int[2]) -> int{
+    var aa:int
+    return aa
+}
 def main() { 
-    var b:bool
-    var c:str
-    var d:char
-    a = 1 + 1
-    b = 1==1 or 1 >2
-    d = "a"
-    c = "sss"
+    //if (1==1) {
+    //    
+    //}elif (1>1){
+    //}else{}
+
+    //while (true) {
+    //    var a:int
+    //}
+
+    var a:int
+    a = gfunc2(a)
+
+    //var b:bool
+    //var c:str
+    //var d:char[2]
+    //var e:int[2][3]
+    //a = 1 + 1
+    //b = 1==1 or 1 >2
+    //c = "sss"
+    //c = d
+    //e = [1, 2]
 }

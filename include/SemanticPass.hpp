@@ -75,13 +75,26 @@ private:
     static bool isArrayType(const SemaTypePtr &t) {
         return t && t->getKind() == SemaType::TypeKind::ARRAY;
     }
-    static bool typesEqual(const SemaTypePtr &a, const SemaTypePtr &b) {
-        if (a->getKind() == SemaType::TypeKind::STR) {
-            if (auto arr_type = std::dynamic_pointer_cast<const ArrayType>(b)) {
-                return arr_type->elementType()->getKind() == SemaType::TypeKind::CHAR;
-            }
+    static bool isCharStrCompatible(const SemaTypePtr &a, const SemaTypePtr &b) {
+        if (!a || !b) {
+            return false;
         }
+        if (a->getKind() != SemaType::TypeKind::STR) {
+            return false;
+        }
+        auto arr_type = std::dynamic_pointer_cast<const ArrayType>(b);
+        if (!arr_type) {
+            return false;
+        }
+        auto elem_type = arr_type->elementType();
+        if (elem_type->getKind() == SemaType::TypeKind::ARRAY) {
+            return false;
+        }
+        return elem_type->getKind() == SemaType::TypeKind::CHAR;
+    }
+    static bool typesEqual(const SemaTypePtr &a, const SemaTypePtr &b) {
         if (a == b) return true;
+        if (isCharStrCompatible(a, b) || isCharStrCompatible(b, a)) return true;
         if (!a || !b) return false;
         return a->equals(*b);
     }

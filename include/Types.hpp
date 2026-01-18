@@ -17,6 +17,8 @@ namespace DataType {
         switch (dt) {
             case DataType::INT:
                 return "int";
+            case DataType::CHAR:
+                return "char";
             case DataType::FLOAT:
                 return "float";
             case DataType::BOOL:

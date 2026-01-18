@@ -42,7 +42,7 @@ void SemanticPass::visit(Program &node) {
     // locate main function
     VerifyEntryPoint(defs);
 }
-void SemanticPass::visit(Header &node) { std::cout << "Header\n"; }
+void SemanticPass::visit(Header &node) {}
 void SemanticPass::visit(ClassDef &node) { std::cout << "ClassDef\n"; }
 void SemanticPass::visit(FuncDecl &node) {
     auto *header = node.funcHeader();
@@ -234,9 +234,48 @@ void SemanticPass::visit(Block &node) {
 
 void SemanticPass::visit(SkipStmt &node) { std::cout << "SkipStmt\n"; }
 void SemanticPass::visit(ExitStmt &node) { std::cout << "ExitStmt\n"; }
-void SemanticPass::visit(IfStmt &node) { std::cout << "IfStmt\n"; }
-void SemanticPass::visit(LoopStmt &node) { std::cout << "LoopStmt\n"; }
-void SemanticPass::visit(ReturnStmt &node) { std::cout << "ReturnStmt\n"; }
+void SemanticPass::visit(IfStmt &node) {
+    if (auto *cond = node.conditionExpr()) {
+        cond->accept(*this);
+    }
+    if (auto *thenBranch = node.thenBlock()) {
+        thenBranch->accept(*this);
+    }
+    for (auto &elif: node.elifs()) {
+        if (elif.first) {
+            elif.first->accept(*this);
+        }
+        if (elif.second) {
+            elif.second->accept(*this);
+        }
+    }
+    if (auto *elseBranch = node.elseBlock()) {
+        elseBranch->accept(*this);
+    }
+}
+void SemanticPass::visit(LoopStmt &node) {
+    if (auto *condition = node.conditionExpr()) {
+        condition->accept(*this);
+    }
+    if (auto *body = node.loopBody()) {
+        body->accept(*this);
+    }
+}
+void SemanticPass::visit(ReturnStmt &node) {
+    auto *value = node.returnValue();
+    if (value) {
+        value->accept(*this);
+    }
+
+    auto frame = semanticCtx.currentFunction();
+    if (!frame || frame->is_procedure || !value) {
+        return;
+    }
+    if (!typesEqual(frame->return_type, value->type())) {
+        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "return type mismatch: expected '" + typeToString(frame->return_type) + "' but got '" + typeToString(value->type()) + "'");
+        throw std::runtime_error("semantic analysis failed");
+    }
+}
 void SemanticPass::visit(AssignStmt &node) {
     auto *lhs = node.left();
     auto *rhs = node.right();
@@ -369,7 +408,28 @@ void SemanticPass::visit(IdLVal &node) {
     node.setType(symbol->getType());
     node.setAssignable(true);
 }
-void SemanticPass::visit(IndexLVal &node) { std::cout << "IndexLVal\n"; }
+void SemanticPass::visit(IndexLVal &node) {
+    auto *base = node.baseExpr();
+    auto *index = node.indexExpr();
+    if (base) {
+        base->accept(*this);
+    }
+    if (index) {
+        index->accept(*this);
+    }
+    auto baseType = base ? base->type() : SemaTypePtr{};
+    if (!isArrayType(baseType)) {
+        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "cannot index non-array value");
+        node.setType(nullptr);
+        node.setAssignable(false);
+        return;
+    }
+    if (!index || !isIntType(index->type())) {
+        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "array index must be of type int");
+    }
+    node.setType(static_cast<const ArrayType *>(baseType.get())->elementType());
+    node.setAssignable(base ? base->isAssignable() : true);
+}
 void SemanticPass::visit(StringLiteralLVal &node) {
     // string is equivalent to array of chars in this Sematic analysis
     // str == char[]
@@ -386,7 +446,26 @@ void SemanticPass::visit(ParenExpr &node) {
     node.setLValue(inner && inner->isLValue());
     node.setAssignable(inner && inner->isAssignable());
 }
-void SemanticPass::visit(FuncCall &node) { std::cout << "FuncCall\n"; }
+void SemanticPass::visit(FuncCall &node) {
+    LookupResult lookup = semanticCtx.lookup(node.identifier());
+    Symbol *symbol = lookup.symbol;
+    auto *funcSym = (lookup.found() && symbol->getKind() == Symbol::SymKind::FUNC)
+                        ? static_cast<FuncSymbol *>(symbol)
+                        : nullptr;
+    if (!funcSym || funcSym->isProcedure()) {
+        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "unknown function '" + node.identifier() + "'");
+        node.setFuncSymbol(nullptr);
+        node.setType(nullptr);
+        return;
+    }
+    node.setFuncSymbol(funcSym);
+    const auto &params = funcSym->getParams();
+    checkArguments(node.arguments(), params, node.identifier(), node.loc);
+    const auto *sig = static_cast<const FuncType *>(funcSym->getType().get());
+    node.setType(sig ? sig->returnType() : SemaTypePtr{});
+    node.setLValue(false);
+    node.setAssignable(false);
+}
 
 void SemanticPass::visit(IntConst &node) {
     node.setType(makeIntType());
@@ -412,13 +491,13 @@ void SemanticPass::visit(ExprCond &node) {
     // Dana does not allow bare expressions as conditions - except boolean literals;
     // conditions must be relational (=, <>, <, >, <=, >=) or logical (and, or, not)
     // for variables of type byte.
-    if (dynamic_cast<TrueConst *>(node.expression()) ||
-        dynamic_cast<FalseConst *>(node.expression())) {
-        node.setType(makeByteType());
-        return;
-    }
+    // if (dynamic_cast<TrueConst *>(node.expression()) ||
+    //     dynamic_cast<FalseConst *>(node.expression())) {
+    //     node.setType(makeBoolType());
+    //     return;
+    // }
     // semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "bare expression cannot be used as condition");
-    node.setType(makeByteType());
+    node.setType(makeBoolType());
 }
 
 
@@ -460,8 +539,38 @@ void SemanticPass::VerifyEntryPoint(const vec<uptr<ASTNode>> &defs) {
 }
 
 // Type resolution helper
-bool SemanticPass::arrayTypesCompatible(const ArrayType *actual, const ArrayType *expected) { return true; }
-bool SemanticPass::typesCompatible(const SemaTypePtr &actual, const SemaTypePtr &expected) { return false; }
+bool SemanticPass::arrayTypesCompatible(const ArrayType *actual, const ArrayType *expected) {
+    if (!actual || !expected) return false;
+
+    const auto expectedSize = expected->size();
+    const auto actualSize = actual->size();
+
+    // If the parameter is sized, require an exact match from the caller
+    if (expectedSize) {
+        if (!actualSize || *actualSize != *expectedSize) {
+            return false;
+        }
+    }
+    // If the parameter is unsized, any actual size is acceptable
+    return typesCompatible(actual->elementType(), expected->elementType());
+}
+bool SemanticPass::typesCompatible(const SemaTypePtr &actual, const SemaTypePtr &expected) {
+    if (actual == expected) return true;
+    if (!actual || !expected) return false;
+
+    if (expected->getKind() == SemaType::TypeKind::ARRAY) {
+        if (actual->getKind() != SemaType::TypeKind::ARRAY) {
+            return false;
+        }
+        return arrayTypesCompatible(
+            static_cast<const ArrayType *>(actual.get()),
+            static_cast<const ArrayType *>(expected.get())
+        );
+    }
+
+    // For non-array types, fall back to structural equality
+    return typesEqual(actual, expected);
+}
 
 bool SemanticPass::validateDimension(const std::optional<int> &dim, bool allowUnsized, const Location &loc) {
     if (!dim.has_value()) {
@@ -482,6 +591,7 @@ bool SemanticPass::validateDimension(const std::optional<int> &dim, bool allowUn
 }
 SemaTypePtr SemanticPass::buildArrayType(const Location &loc, SemaTypePtr base, const vec<std::optional<int>> &dims, bool allowUnsizedFirst) {
     SemaTypePtr currentType = std::move(base);
+    //! Attention: build from innermost to outermost
     for (std::size_t i = dims.size(); i-- > 0;) {
         const auto &dim = dims[i];
         if (!validateDimension(dim, allowUnsizedFirst && i == 0, loc)) {
@@ -598,4 +708,34 @@ bool SemanticPass::collectParams(const Header &header, std::vector<ParamInfo> &p
     return true;
 }
 bool SemanticPass::signaturesMatch(bool isProcedure, const SemaTypePtr &returnType, const std::vector<ParamInfo> &params, const Symbol *symbol) { return true; }
-bool SemanticPass::checkArguments(const vec<uptr<Expr>> &args, const std::vector<ParamSymbol *> &params, const std::string &callee, const Location &loc) { return true; }
+bool SemanticPass::checkArguments(const vec<uptr<Expr>> &args, const std::vector<ParamSymbol *> &params, const std::string &callee, const Location &loc) {
+    if (args.size() != params.size()) {
+        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, loc, "call to '" + callee + "' expects " + std::to_string(params.size()) + " argument(s) but got " + std::to_string(args.size()));
+        throw std::runtime_error("semantic analysis failed");
+    }
+    int count = std::min(args.size(), params.size());
+
+    for (int i = 0; i < count; ++i) {
+        auto *arg = args[i].get();
+        if (arg) {
+            arg->accept(*this);
+        }
+        auto actualType = arg ? arg->type() : SemaTypePtr{};
+        if (!typesCompatible(actualType, params[i]->getType())) {
+            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, arg ? arg->loc : loc, "in call to '" + callee + "', argument " + std::to_string(i + 1) + " has type '" + typeToString(actualType) + "', expected '" + typeToString(params[i]->getType()) + "'");
+            throw std::runtime_error("semantic analysis failed");
+        }
+        if (params[i]->getPass() == Symbol::ParamPass::BY_REF) {
+            if (!arg || !arg->isLValue()) {
+                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, arg ? arg->loc : loc, "in call to '" + callee + "', argument " + std::to_string(i + 1) + " must be an l-value for by-ref parameter");
+                throw std::runtime_error("semantic analysis failed");
+            }
+        }
+    }
+    for (int i = count; i < args.size(); ++i) {
+        if (auto *arg = args[i].get()) {
+            arg->accept(*this);
+        }
+    }
+    return args.size() == params.size();
+}
