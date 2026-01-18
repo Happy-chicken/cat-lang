@@ -18,13 +18,11 @@ enum class BinOp {
     Le,
     Ge,
     Lt,
-    Gt
-};
-
-enum class LogicOp {
+    Gt,
     And,
     Or
 };
+
 
 inline const char *unOpName(UnOp op) {
     switch (op) {
@@ -66,15 +64,9 @@ inline const char *binOpName(BinOp op) {
             return "<";
         case BinOp::Gt:
             return ">";
-    }
-    return "?";
-}
-
-inline const char *logicOpName(LogicOp op) {
-    switch (op) {
-        case LogicOp::And:
+        case BinOp::And:
             return "and";
-        case LogicOp::Or:
+        case BinOp::Or:
             return "or";
     }
     return "?";

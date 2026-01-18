@@ -1,5 +1,6 @@
 #include "SemaType.hpp"
 
+#include <cstddef>
 #include <utility>
 
 SemaType::SemaType(TypeKind kind)
@@ -149,8 +150,8 @@ SemaTypePtr makeCharType() {
     return instance;
 }
 
-SemaTypePtr makeStrType() {
-    static SemaTypePtr instance = makeType<StrType>();
+SemaTypePtr makeStrType(std::size_t length) {
+    static SemaTypePtr instance = makeType<StrType>(length);
     return instance;
 }
 

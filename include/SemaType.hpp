@@ -91,9 +91,12 @@ public:
 
 class StrType : public SemaType {
 public:
-    StrType() : SemaType(TypeKind::STR) {}
+    StrType(std::size_t length) : SemaType(TypeKind::STR), length_(length) {}
 
     bool equals(const SemaType &other) const override;
+
+private:
+    std::size_t length_;
 };
 
 
@@ -153,7 +156,7 @@ public:
 SemaTypePtr makeIntType();
 SemaTypePtr makeBoolType();
 SemaTypePtr makeCharType();
-SemaTypePtr makeStrType();
+SemaTypePtr makeStrType(std::size_t length = 0);
 SemaTypePtr makeByteType();
 SemaTypePtr makeVoidType();
 SemaTypePtr makeArrayType(SemaTypePtr elementType, std::optional<std::size_t> size);

@@ -1,6 +1,7 @@
 #include "SemanticPass.hpp"
 #include "AST.hpp"
 #include "Diagnostics.hpp"
+#include "Operator.hpp"
 #include "SemaType.hpp"
 #include "SemanticCtx.hpp"
 #include "Symbol.hpp"
@@ -8,10 +9,10 @@
 #include <cstddef>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <unordered_set>
 #include <utility>
-
 void SemanticPass::visit(Type &node) {
     resolveType(node);
 }
@@ -43,8 +44,8 @@ void SemanticPass::visit(Program &node) {
 }
 void SemanticPass::visit(Header &node) { std::cout << "Header\n"; }
 void SemanticPass::visit(ClassDef &node) { std::cout << "ClassDef\n"; }
-void SemanticPass::visit(FuncDecl &n) {
-    auto *header = n.funcHeader();
+void SemanticPass::visit(FuncDecl &node) {
+    auto *header = node.funcHeader();
     if (!header) {
         return;
     }
@@ -66,11 +67,11 @@ void SemanticPass::visit(FuncDecl &n) {
     Symbol *symbol = existing.symbol;
     if (symbol) {
         if (!signaturesMatch(isProcedure, returnType, params, symbol)) {
-            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, n.loc, "forward declaration of '" + name + "' conflicts with previous declaration");
+            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "forward declaration of '" + name + "' conflicts with previous declaration");
             throw std::runtime_error("semantic analysis failed");
         }
         if (symbol->isDefined()) {
-            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, n.loc, "symbol '" + name + "' already defined");
+            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "symbol '" + name + "' already defined");
             throw std::runtime_error("semantic analysis failed");
         }
         semanticCtx.getDiagnostics().report(Diagnostics::Severity::Info, Diagnostics::Phase::SemanticAnalysis, symbol->getLocation(), "previous declaration here");
@@ -268,9 +269,92 @@ void SemanticPass::visit(BreakStmt &node) { std::cout << "BreakStmt\n"; }
 void SemanticPass::visit(ContinueStmt &node) { std::cout << "ContinueStmt\n"; }
 void SemanticPass::visit(ProcCall &node) { std::cout << "ProcCall\n"; }
 
-void SemanticPass::visit(BinaryExpr &node) { std::cout << "BinaryExpr\n"; }
-void SemanticPass::visit(UnaryExpr &node) { std::cout << "UnaryExpr\n"; }
-void SemanticPass::visit(LValueExpr &node) { std::cout << "LValueExpr\n"; }
+void SemanticPass::visit(BinaryExpr &node) {
+    auto *lhs = node.leftExpr();
+    auto *rhs = node.rightExpr();
+    if (lhs) {
+        lhs->accept(*this);
+    }
+    if (rhs) {
+        rhs->accept(*this);
+    }
+    auto leftType = lhs ? lhs->type() : SemaTypePtr{};
+    auto rightType = rhs ? rhs->type() : SemaTypePtr{};
+    switch (node.opKind()) {
+        case BinOp::Add:
+        case BinOp::Sub:
+        case BinOp::Mul:
+        case BinOp::Div:
+        case BinOp::Mod:
+            if (!typesEqual(leftType, rightType) ||
+                !(isIntType(leftType) || isByteType(leftType))) {
+                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "arithmetic operands must both be int or byte");
+            }
+            node.setType(leftType);
+            break;
+        case BinOp::AndBits:
+        case BinOp::OrBits:
+            if (!isByteType(leftType) || !typesEqual(leftType, rightType)) {
+                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "'&' and '|' require byte operands");
+            }
+            node.setType(makeByteType());
+            break;
+        case BinOp::And:
+        case BinOp::Or:
+            if (!isBoolType(leftType) || !typesEqual(leftType, rightType)) {
+                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "'and' and 'or' require bool operands");
+            }
+            node.setType(makeBoolType());
+            break;
+        case BinOp::Eq:
+        case BinOp::Ne:
+        case BinOp::Gt:
+        case BinOp::Lt:
+        case BinOp::Ge:
+        case BinOp::Le:
+            if (!typesEqual(leftType, rightType) ||
+                !(isIntType(leftType) || isByteType(leftType))) {
+                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "comparison operands must both be int or byte");
+            }
+            node.setType(makeBoolType());
+            break;
+    }
+    node.setLValue(false);
+    node.setAssignable(false);
+}
+void SemanticPass::visit(UnaryExpr &node) {
+    auto *operand = node.operandExpr();
+    if (operand) {
+        operand->accept(*this);
+    }
+    auto operandType = operand ? operand->type() : SemaTypePtr{};
+    switch (node.opKind()) {
+        case UnOp::Plus:
+        case UnOp::Minus:
+            if (!isIntType(operandType)) {
+                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "unary '+' and '-' require int operand");
+            }
+            node.setType(makeIntType());
+            break;
+        case UnOp::Not:
+            if (!isBoolType(operandType)) {
+                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "'!' requires byte operand");
+            }
+            node.setType(makeBoolType());
+            break;
+    }
+    node.setLValue(false);
+    node.setAssignable(false);
+}
+void SemanticPass::visit(LValueExpr &node) {
+    auto *value = node.lvalue();
+    if (value) {
+        value->accept(*this);
+    }
+    node.setType(value ? value->type() : SemaTypePtr{});
+    node.setLValue(true);
+    node.setAssignable(value ? value->isAssignable() : false);
+}
 void SemanticPass::visit(IdLVal &node) {
     LookupResult lookup = semanticCtx.lookup(node.identifier());
     Symbol *symbol = lookup.symbol;
@@ -286,19 +370,56 @@ void SemanticPass::visit(IdLVal &node) {
     node.setAssignable(true);
 }
 void SemanticPass::visit(IndexLVal &node) { std::cout << "IndexLVal\n"; }
-void SemanticPass::visit(StringLiteralLVal &node) { std::cout << "StringLiteralLVal\n"; }
-void SemanticPass::visit(ParenExpr &node) { std::cout << "ParenExpr\n"; }
+void SemanticPass::visit(StringLiteralLVal &node) {
+    // string is equivalent to array of chars in this Sematic analysis
+    // str == char[]
+    auto len = static_cast<std::size_t>(node.literal().size() + 1);
+    node.setType(makeStrType(len - 2));// exclude quotes
+    node.setAssignable(false);
+}
+void SemanticPass::visit(ParenExpr &node) {
+    auto *inner = node.innerExpr();
+    if (inner) {
+        inner->accept(*this);
+    }
+    node.setType(inner ? inner->type() : SemaTypePtr{});
+    node.setLValue(inner && inner->isLValue());
+    node.setAssignable(inner && inner->isAssignable());
+}
 void SemanticPass::visit(FuncCall &node) { std::cout << "FuncCall\n"; }
 
 void SemanticPass::visit(IntConst &node) {
     node.setType(makeIntType());
     node.setConstExpr(true);
 }
-void SemanticPass::visit(CharConst &node) { std::cout << "CharConst\n"; }
-void SemanticPass::visit(TrueConst &node) { std::cout << "TrueConst\n"; }
-void SemanticPass::visit(FalseConst &node) { std::cout << "FalseConst\n"; }
+void SemanticPass::visit(CharConst &node) {
+    node.setType(makeCharType());
+    node.setConstExpr(true);
+}
+void SemanticPass::visit(TrueConst &node) {
+    node.setType(makeBoolType());
+    node.setConstExpr(true);
+}
+void SemanticPass::visit(FalseConst &node) {
+    node.setType(makeBoolType());
+    node.setConstExpr(true);
+}
 
-void SemanticPass::visit(ExprCond &node) { std::cout << "ExprCond\n"; }
+void SemanticPass::visit(ExprCond &node) {
+    if (auto *expr = node.expression()) {
+        expr->accept(*this);
+    }
+    // Dana does not allow bare expressions as conditions - except boolean literals;
+    // conditions must be relational (=, <>, <, >, <=, >=) or logical (and, or, not)
+    // for variables of type byte.
+    if (dynamic_cast<TrueConst *>(node.expression()) ||
+        dynamic_cast<FalseConst *>(node.expression())) {
+        node.setType(makeByteType());
+        return;
+    }
+    // semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "bare expression cannot be used as condition");
+    node.setType(makeByteType());
+}
 
 
 //
@@ -408,7 +529,39 @@ SemaTypePtr SemanticPass::resolveParamType(const FuncParameterType &node, Symbol
     }
     return resolvedType;
 }
-std::string SemanticPass::typeToString(const SemaTypePtr &type) { return "ok"; }
+std::string SemanticPass::typeToString(const SemaTypePtr &type) {
+    if (!type) {
+        return "<invalid type>";
+    }
+    switch (type->getKind()) {
+        case SemaType::TypeKind::INT:
+            return "int";
+        case SemaType::TypeKind::BOOL:
+            return "bool";
+        case SemaType::TypeKind::CHAR:
+            return "char";
+        case SemaType::TypeKind::BYTE:
+            return "byte";
+        case SemaType::TypeKind::STR:
+            return "string";
+        case SemaType::TypeKind::ARRAY: {
+            const ArrayType *arrType = static_cast<const ArrayType *>(type.get());
+            std::ostringstream oss;
+            oss << typeToString(arrType->elementType()) << '[';
+            if (arrType->size()) {
+                oss << *arrType->size();
+            }
+            oss << ']';
+            return oss.str();
+        }
+        case SemaType::TypeKind::FUNC:
+            return "fn";
+        case SemaType::TypeKind::VOID:
+            return "void";
+        default:
+            return "<unknown type>";
+    }
+}
 
 // Semantic analysis helpers
 bool SemanticPass::collectParams(const Header &header, std::vector<ParamInfo> &params) {

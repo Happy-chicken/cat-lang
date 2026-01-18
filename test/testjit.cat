@@ -2,10 +2,11 @@
 var a:int
 decl gfunc(a:int)
 def main() { 
-    var b:int
+    var b:bool
     var c:str
     var d:char
-    a = 1
-    b = 1
-    //c = "sss"
+    a = 1 + 1
+    b = 1==1 or 1 >2
+    d = "a"
+    c = "sss"
 }

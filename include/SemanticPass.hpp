@@ -5,6 +5,7 @@
 #include "SemaType.hpp"
 #include "SemanticCtx.hpp"
 #include "Types.hpp"
+#include <memory>
 
 class SemanticCtx;
 
@@ -75,6 +76,11 @@ private:
         return t && t->getKind() == SemaType::TypeKind::ARRAY;
     }
     static bool typesEqual(const SemaTypePtr &a, const SemaTypePtr &b) {
+        if (a->getKind() == SemaType::TypeKind::STR) {
+            if (auto arr_type = std::dynamic_pointer_cast<const ArrayType>(b)) {
+                return arr_type->elementType()->getKind() == SemaType::TypeKind::CHAR;
+            }
+        }
         if (a == b) return true;
         if (!a || !b) return false;
         return a->equals(*b);

@@ -10,6 +10,7 @@
 #include "AST.hpp"
 #include "Diagnostics.hpp"
 #include "Location.hpp"
+#include "Operator.hpp"
 #include "Parser.hpp"
 #include "Token.hpp"
 #include "Types.hpp"
@@ -344,7 +345,7 @@ uptr<Expr> Parser::parseLogicalOr() {
     while (match({OR})) {
         auto loc = currentLocation();
         auto right = parseLogicalAnd();
-        left = make_unique<BinaryExpr>(loc, BinOp::OrBits, std::move(left), std::move(right));
+        left = make_unique<BinaryExpr>(loc, BinOp::Or, std::move(left), std::move(right));
     }
     return left;
 }
@@ -353,7 +354,7 @@ uptr<Expr> Parser::parseLogicalAnd() {
     while (match({AND})) {
         Location loc = currentLocation();
         auto right = parseEquality();
-        left = std::make_unique<BinaryExpr>(loc, BinOp::AndBits, std::move(left), std::move(right));
+        left = std::make_unique<BinaryExpr>(loc, BinOp::And, std::move(left), std::move(right));
     }
     return left;
 }
