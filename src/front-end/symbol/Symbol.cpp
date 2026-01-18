@@ -74,3 +74,28 @@ const std::vector<ParamSymbol *> &FuncSymbol::getParams() const {
 void FuncSymbol::clearParams() {
     params_.clear();
 }
+
+void Symbol::dump(std::ostream &out) const {
+    out << "Symbol(name='" << name_ << "', kind=";
+    switch (kind_) {
+        case SymKind::VAR:
+            out << "VAR";
+            break;
+        case SymKind::PARAM:
+            out << "PARAM";
+            break;
+        case SymKind::FUNC:
+            out << "FUNC";
+            break;
+        case SymKind::CLASS:
+            out << "CLASS";
+            break;
+    }
+    out << ", type=";
+    if (type_) {
+        type_->dump(out);
+    } else {
+        out << "null";
+    }
+    out << ")";
+}

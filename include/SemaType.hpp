@@ -3,8 +3,8 @@
 #include <cstddef>
 #include <memory>
 #include <optional>
+#include <ostream>
 #include <vector>
-
 class SemaType {
 public:
     enum class TypeKind {
@@ -23,6 +23,40 @@ public:
     TypeKind getKind() const;
     virtual bool equals(const SemaType &other) const = 0;// for type-checking
 
+    void dump(std::ostream &out) const {
+        out << "SemaType(kind=";
+        switch (kind_) {
+            case TypeKind::INT:
+                out << "INT";
+                break;
+            case TypeKind::CHAR:
+                out << "CHAR";
+                break;
+            case TypeKind::BOOL:
+                out << "BOOL";
+                break;
+            case TypeKind::BYTE:
+                out << "BYTE";
+                break;
+            case TypeKind::STR:
+                out << "STR";
+                break;
+            case TypeKind::ARRAY:
+                out << "ARRAY";
+                break;
+            case TypeKind::FUNC:
+                out << "FUNC";
+                break;
+            case TypeKind::CLS:
+                out << "CLS";
+                break;
+            case TypeKind::VOID:
+                out << "VOID";
+                break;
+        }
+        out << ")";
+    }
+
 protected:
     explicit SemaType(TypeKind kind);
 
@@ -40,6 +74,28 @@ public:
 
     bool equals(const SemaType &other) const override;
 };
+
+class BoolType : public SemaType {
+public:
+    BoolType() : SemaType(TypeKind::BOOL) {}
+
+    bool equals(const SemaType &other) const override;
+};
+
+class CharType : public SemaType {
+public:
+    CharType() : SemaType(TypeKind::CHAR) {}
+
+    bool equals(const SemaType &other) const override;
+};
+
+class StrType : public SemaType {
+public:
+    StrType() : SemaType(TypeKind::STR) {}
+
+    bool equals(const SemaType &other) const override;
+};
+
 
 class ByteType : public SemaType {
 public:
@@ -95,6 +151,9 @@ public:
 };
 
 SemaTypePtr makeIntType();
+SemaTypePtr makeBoolType();
+SemaTypePtr makeCharType();
+SemaTypePtr makeStrType();
 SemaTypePtr makeByteType();
 SemaTypePtr makeVoidType();
 SemaTypePtr makeArrayType(SemaTypePtr elementType, std::optional<std::size_t> size);

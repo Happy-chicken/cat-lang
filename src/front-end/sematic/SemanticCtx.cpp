@@ -6,15 +6,17 @@ InsertResult SemanticCtx::declareSymbol(uptr<Symbol> sym, bool isRedeclared) {
     if (!sym) {
         return InsertResult::error();
     }
-    auto result = symbol_table.declare(std::move(sym));
+
     const string name = sym->getName();
     const Location loc = sym->getLocation();
+    auto result = symbol_table.declare(std::move(sym));
 
     if (isRedeclared && result.isRedeclared()) {
         diagnostics.report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, loc, "symbol '" + name + "' already declared in this scope.");
         if (result.symbol) {
             diagnostics.report(Diagnostics::Severity::Info, Diagnostics::Phase::SemanticAnalysis, result.symbol->getLocation(), "previous declaration is here.");
         }
+        throw std::runtime_error("semantic analysis failed");
     }
     return result;
 }

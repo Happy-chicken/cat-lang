@@ -29,6 +29,18 @@ public:
         return symbolTable_;
     }
 
+    void dump(std::ostream &out) const {
+        auto *ps = shared_from_this().get();
+        while (ps) {
+            for (const auto &pair: symbolTable_) {
+                out << pair.first << ":";
+                pair.second->dump(out);
+                out << "\n";
+            }
+            ps = ps->getParentScope().get();
+        }
+    }
+
 private:
     sptr<Scope> parent_scope = nullptr;          // parent Scope link(parent_)
     unordered_map<string, Symbol *> symbolTable_;// symbol table

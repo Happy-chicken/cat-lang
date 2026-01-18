@@ -33,6 +33,21 @@ public:
     void leaveFunction();
     sptr<FunctionFrame> currentFunction();
     const sptr<FunctionFrame> currentFunction() const;
+    void dumpSymbolTable(std::ostream &out) const {
+        symbol_table.dump(out);
+    }
+    void dumpFuncFrames(std::ostream &out) const {
+        out << "Function stack (depth " << function_stack.size() << "):\n";
+        for (std::size_t i = 0; i < function_stack.size(); ++i) {
+            auto &frame = function_stack[i];
+            out << "  [" << i << "] ";
+            if (frame && frame->symbol) {
+                out << frame->symbol->getName() << "\n";
+            } else {
+                out << "<null>\n";
+            }
+        }
+    }
 
 private:
     SymbolTable &symbol_table;

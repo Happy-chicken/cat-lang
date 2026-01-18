@@ -70,7 +70,6 @@ void Cat::build(const string &program) {
         auto parser = Parser(scanner);
         auto root = parser.parse();
         root->print(std::cout);
-        std::cout << "Done!\n";
         // ---------------------------------------------------------------------------
         // semantic analysis
         // 知道变量类型，作用域，函数调用，重定义，未定义等行为
@@ -78,6 +77,9 @@ void Cat::build(const string &program) {
         auto symbolTable = SymbolTable();
         auto semanticCtx = SemanticCtx(symbolTable, diagnostics);
         passDriver.runSemanticPass(semanticCtx);
+        semanticCtx.dumpSymbolTable(std::cout);
+        // semanticCtx.dumpFuncFrames(std::cout);
+
     } catch (const std::runtime_error &e) {
         diagnostics.printAll();
         std::cerr << "Build failed: " << e.what() << std::endl;

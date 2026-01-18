@@ -154,13 +154,13 @@ public:
 // Program root node
 class Program : public ASTNode {
 public:
-    Program(Location l, vec<uptr<Def>> defs = {});
+    Program(Location l, vec<uptr<ASTNode>> defs = {});
     void accept(AstVisitor &v) override;
     void print(std::ostream &out) const override;
-    const vec<uptr<Def>> &getDefs() const { return defs; }
+    const vec<uptr<ASTNode>> &getDefs() const { return defs; }
 
 private:
-    vec<uptr<Def>> defs;
+    vec<uptr<ASTNode>> defs;
 };
 
 // ===== High-level program and definition nodes =====

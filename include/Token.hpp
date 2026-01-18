@@ -77,6 +77,7 @@ typedef enum {
     INT,
     DOUBLE,
     BOOL,
+    CHAR,
     STR,
     LIST,
 

@@ -23,7 +23,7 @@ using std::runtime_error;
 sptr<Program> Parser::parse() {
     advance();
     Location loc = currentLocation();
-    vec<uptr<Def>> defs;
+    vec<uptr<ASTNode>> defs;
     while (!isAtEnd()) {
         defs.push_back(parseDeclarations());
     }
@@ -31,7 +31,7 @@ sptr<Program> Parser::parse() {
 }
 
 // driver functions
-uptr<Def> Parser::parseDeclarations() {
+uptr<ASTNode> Parser::parseDeclarations() {
     if (check(DEF)) {
         return parseFuncDef();
     } else if (check(DECL)) {
@@ -40,10 +40,9 @@ uptr<Def> Parser::parseDeclarations() {
         return parseClassDef();
     }
     // TODO: global variable
-    // } else if (check(VAR)) {
-    //     return parseVarDef();
-    // }
-    else {
+    else if (check(VAR)) {
+        return parseVarDef();
+    } else {
         throw error(peek(), "Expect 'def', 'class' or 'var' to declare function, class or variable.");
     }
 }
@@ -200,6 +199,7 @@ uptr<Type> Parser::parseType() {
 DataType::DataType Parser::parseDataType() {
     if (match({INT})) return DataType::DataType::INT;
     if (match({BOOL})) return DataType::DataType::BOOL;
+    if (match({CHAR})) return DataType::DataType::CHAR;
     if (match({STR})) return DataType::DataType::STRING;
     if (match({IDENTIFIER})) return DataType::DataType::CLASS;
     return DataType::DataType::UNKOWN;
@@ -456,7 +456,9 @@ uptr<Expr> Parser::parsePrimary() {
     // if (match({NUMBER})){
     //     return std::make_unique<DoubleConst>(loc, std::stod(previous().lexeme));
     // }
-    if (match({STRING})) {
+    // if (match({STR})) {
+    // }
+    if (match({CHAR})) {
         return std::make_unique<CharConst>(loc, previous().lexeme[0]);
     }
     if (match({TRUE})) {

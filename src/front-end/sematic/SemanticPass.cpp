@@ -24,35 +24,211 @@ void SemanticPass::visit(FuncParameterType &node) {
 void SemanticPass::visit(Program &node) {
     // program entry point
     auto &defs = node.getDefs();
-    FuncDef *main_fun = nullptr;
     // first pass: collect function declareation and class definitions
     for (const auto &d: defs) {
         if (auto *funcDef = dynamic_cast<FuncDef *>(d.get())) {
-            // declareFunctionHeader(funcDef->funcHeader());
+            declareFunctionHeader(funcDef->funcHeader());
         } else if (auto *classDef = dynamic_cast<ClassDef *>(d.get())) {
             // declareClassDefinition(classDef);
         } else if (auto *funcDecl = dynamic_cast<FuncDecl *>(d.get())) {
-            // declareFunctionHeader(funcDecl->funcHeader());
+            declareFunctionHeader(funcDecl->funcHeader());
         }
     }
     // second pass: visit all definitions
+    for (const auto &d: defs) {
+        d->accept(*this);
+    }
+    // locate main function
+    VerifyEntryPoint(defs);
 }
 void SemanticPass::visit(Header &node) { std::cout << "Header\n"; }
 void SemanticPass::visit(ClassDef &node) { std::cout << "ClassDef\n"; }
 void SemanticPass::visit(FuncDecl &n) {
-    // nothing to do
+    auto *header = n.funcHeader();
+    if (!header) {
+        return;
+    }
+
+    // Collect header info directly from AST
+    const std::string &name = header->identifier();
+    const auto returnTypeOpt = header->returnType();
+    const bool isProcedure = !returnTypeOpt.has_value();
+    const SemaTypePtr returnType = isProcedure ? makeVoidType() : scalarType(*returnTypeOpt);
+
+    // Collect parameters
+    std::vector<ParamInfo> params;
+    if (!collectParams(*header, params)) {
+        return;// errors already reported
+    }
+
+    // Check for existing declaration
+    auto existing = semanticCtx.lookupLocalSymbol(name);
+    Symbol *symbol = existing.symbol;
+    if (symbol) {
+        if (!signaturesMatch(isProcedure, returnType, params, symbol)) {
+            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, n.loc, "forward declaration of '" + name + "' conflicts with previous declaration");
+            throw std::runtime_error("semantic analysis failed");
+        }
+        if (symbol->isDefined()) {
+            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, n.loc, "symbol '" + name + "' already defined");
+            throw std::runtime_error("semantic analysis failed");
+        }
+        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Info, Diagnostics::Phase::SemanticAnalysis, symbol->getLocation(), "previous declaration here");
+        header->setSymbol(static_cast<FuncSymbol *>(symbol));
+        throw std::runtime_error("semantic analysis failed");
+    }
+
+    // Create function signature and symbol
+    std::vector<SemaTypePtr> paramTypes;
+    paramTypes.reserve(params.size());
+    for (const auto &p: params) {
+        paramTypes.push_back(p.type);
+    }
+    auto sig = makeFuncType(returnType, std::move(paramTypes));
+    auto func = std::make_unique<FuncSymbol>(name, std::move(sig), isProcedure, header->loc);
+
+    // Create temporary scope for parameters (orphaned after FuncDecl)
+    semanticCtx.beginScope();
+    for (const auto &paramInfo: params) {
+        auto p = std::make_unique<ParamSymbol>(paramInfo.name, paramInfo.type, paramInfo.passMode, paramInfo.loc);
+        p->setDefiningFunc(func.get());
+        auto result = semanticCtx.declareSymbol(std::move(p));
+        if (result.symbol) {
+            func->addParam(static_cast<ParamSymbol *>(result.symbol));
+        }
+    }
+    semanticCtx.endScope();
+
+    FuncSymbol *raw = func.get();
+    if (auto frame = semanticCtx.currentFunction()) {
+        raw->setDefiningFunc(frame->symbol);
+    }
+    semanticCtx.declareSymbol(std::move(func));
+    raw->markForwardDeclaration();
+    header->setSymbol(raw);
 }
 void SemanticPass::visit(FuncDef &node) {
-    // nothing to do
+    auto *header = node.funcHeader();
+    if (!header) {
+        return;
+    }
+
+    // Collect header info directly from AST
+    const std::string &name = header->identifier();
+    const auto returnTypeOpt = header->returnType();
+    const bool isProcedure = !returnTypeOpt.has_value();
+    const SemaTypePtr returnType = isProcedure ? makeVoidType() : scalarType(*returnTypeOpt);
+
+    // Collect parameters
+    std::vector<ParamInfo> params;
+    if (!collectParams(*header, params)) {
+        return;// errors already reported
+    }
+
+    // Check for existing declaration
+    auto existing = semanticCtx.lookupLocalSymbol(name);
+    Symbol *symbol = existing.symbol;
+    bool wasForwardDeclared = false;
+
+    if (symbol) {
+        if (!signaturesMatch(isProcedure, returnType, params, symbol)) {
+            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "definition of '" + name + "' does not match prior declaration");
+            throw std::runtime_error("semantic analysis failed");
+        }
+        if (symbol->isDefined()) {
+            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "redefinition of '" + name + "'");
+            throw std::runtime_error("semantic analysis failed");
+        }
+        wasForwardDeclared = true;
+    }
+
+    FuncSymbol *fsym = nullptr;
+
+    if (wasForwardDeclared) {
+        // Use existing symbol from forward declaration
+        fsym = static_cast<FuncSymbol *>(symbol);
+        // Clear old params - they were orphaned when the FuncDecl's scope closed
+        fsym->clearParams();
+    } else {
+        // Create new function symbol
+        std::vector<SemaTypePtr> paramTypes;
+        paramTypes.reserve(params.size());
+        for (const auto &p: params) {
+            paramTypes.push_back(p.type);
+        }
+        auto sig = makeFuncType(returnType, std::move(paramTypes));
+        auto func = std::make_unique<FuncSymbol>(name, std::move(sig), isProcedure, header->loc);
+        fsym = func.get();
+        semanticCtx.declareSymbol(std::move(func));
+    }
+
+    fsym->setDefiningFunc(semanticCtx.currentFunction() ? semanticCtx.currentFunction()->symbol : nullptr);
+    header->setSymbol(fsym);
+
+    semanticCtx.beginScope();
+
+    // Create function frame
+    sptr<SemanticCtx::FunctionFrame> frame = std::make_shared<SemanticCtx::FunctionFrame>();
+    frame->symbol = fsym;
+    frame->is_procedure = isProcedure;
+    frame->return_type = returnType;
+    semanticCtx.enterFunction(frame);
+
+    // Declare parameters in the new scope
+    for (const auto &paramInfo: params) {
+        auto sym = std::make_unique<ParamSymbol>(paramInfo.name, paramInfo.type, paramInfo.passMode, paramInfo.loc);
+        sym->setDefiningFunc(fsym);
+        auto result = semanticCtx.declareSymbol(std::move(sym));
+        if (result.symbol) {
+            fsym->addParam(static_cast<ParamSymbol *>(result.symbol));
+        }
+    }
+
+    for (auto &def: node.localDefs()) {
+        if (def) {
+            def->accept(*this);
+        }
+    }
+
+    if (auto *body = node.funcBody()) {
+        body->accept(*this);
+    }
+
+    semanticCtx.leaveFunction();
+    semanticCtx.endScope();
+    fsym->markDefined();
 }
 void SemanticPass::visit(VarDef &node) {
-    // nothing to do
+    node.symbols().clear();
+    Type *typeNode = node.declaredType();
+    if (!typeNode) {
+        return;
+    }
+    auto resolved_type = resolveType(*typeNode);
+    if (!resolved_type) {
+        return;
+    }
+    for (const auto &id: node.identifiers()) {
+        auto sym = std::make_unique<VarSymbol>(id, resolved_type, node.loc);
+        VarSymbol *raw = sym.get();
+        if (auto frame = semanticCtx.currentFunction()) {
+            raw->setDefiningFunc(static_cast<FuncSymbol *>(frame->symbol));
+        }
+        semanticCtx.declareSymbol(std::move(sym));
+        node.symbols().push_back(raw);
+    }
 }
 void SemanticPass::visit(FuncParameterDef &node) {
-    // nothing to do
+    if (auto *t = node.parameterType()) {
+        t->accept(*this);
+    }
 }
 void SemanticPass::visit(Block &node) {
-    std::cout << "Block\n";
+    for (auto &stmt: node.statementsList()) {
+        if (stmt) {
+            stmt->accept(*this);
+        }
+    }
 }
 
 void SemanticPass::visit(SkipStmt &node) { std::cout << "SkipStmt\n"; }
@@ -60,7 +236,34 @@ void SemanticPass::visit(ExitStmt &node) { std::cout << "ExitStmt\n"; }
 void SemanticPass::visit(IfStmt &node) { std::cout << "IfStmt\n"; }
 void SemanticPass::visit(LoopStmt &node) { std::cout << "LoopStmt\n"; }
 void SemanticPass::visit(ReturnStmt &node) { std::cout << "ReturnStmt\n"; }
-void SemanticPass::visit(AssignStmt &node) { std::cout << "AssignStmt\n"; }
+void SemanticPass::visit(AssignStmt &node) {
+    auto *lhs = node.left();
+    auto *rhs = node.right();
+    if (lhs) {
+        lhs->accept(*this);
+    }
+    if (rhs) {
+        rhs->accept(*this);
+    }
+    auto leftType = lhs ? lhs->type() : SemaTypePtr{};
+    auto rightType = rhs ? rhs->type() : SemaTypePtr{};
+    if (!leftType) {
+        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "invalid assignment target");
+        throw std::runtime_error("semantic analysis failed");
+    }
+    if (isArrayType(leftType)) {
+        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "cannot assign to an array value");
+        throw std::runtime_error("semantic analysis failed");
+    }
+    if (lhs && !lhs->isAssignable()) {
+        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "left-hand side of assignment is not assignable");
+        throw std::runtime_error("semantic analysis failed");
+    }
+    if (!typesEqual(leftType, rightType)) {
+        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "assignment type mismatch: left is '" + typeToString(leftType) + "', right is '" + typeToString(rightType) + "'");
+        throw std::runtime_error("semantic analysis failed");
+    }
+}
 void SemanticPass::visit(BreakStmt &node) { std::cout << "BreakStmt\n"; }
 void SemanticPass::visit(ContinueStmt &node) { std::cout << "ContinueStmt\n"; }
 void SemanticPass::visit(ProcCall &node) { std::cout << "ProcCall\n"; }
@@ -68,13 +271,29 @@ void SemanticPass::visit(ProcCall &node) { std::cout << "ProcCall\n"; }
 void SemanticPass::visit(BinaryExpr &node) { std::cout << "BinaryExpr\n"; }
 void SemanticPass::visit(UnaryExpr &node) { std::cout << "UnaryExpr\n"; }
 void SemanticPass::visit(LValueExpr &node) { std::cout << "LValueExpr\n"; }
-void SemanticPass::visit(IdLVal &node) { std::cout << "IdLVal\n"; }
+void SemanticPass::visit(IdLVal &node) {
+    LookupResult lookup = semanticCtx.lookup(node.identifier());
+    Symbol *symbol = lookup.symbol;
+    if (!lookup.found() || !(symbol->isVariable() || symbol->isParameter())) {
+        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "unknown variable '" + node.identifier() + "'");
+        node.setType(nullptr);
+        node.setAssignable(false);
+        node.setSymbol(nullptr);
+        throw std::runtime_error("semantic analysis failed");
+    }
+    node.setSymbol(symbol);
+    node.setType(symbol->getType());
+    node.setAssignable(true);
+}
 void SemanticPass::visit(IndexLVal &node) { std::cout << "IndexLVal\n"; }
 void SemanticPass::visit(StringLiteralLVal &node) { std::cout << "StringLiteralLVal\n"; }
 void SemanticPass::visit(ParenExpr &node) { std::cout << "ParenExpr\n"; }
 void SemanticPass::visit(FuncCall &node) { std::cout << "FuncCall\n"; }
 
-void SemanticPass::visit(IntConst &node) { std::cout << "IntConst\n"; }
+void SemanticPass::visit(IntConst &node) {
+    node.setType(makeIntType());
+    node.setConstExpr(true);
+}
 void SemanticPass::visit(CharConst &node) { std::cout << "CharConst\n"; }
 void SemanticPass::visit(TrueConst &node) { std::cout << "TrueConst\n"; }
 void SemanticPass::visit(FalseConst &node) { std::cout << "FalseConst\n"; }
@@ -83,26 +302,40 @@ void SemanticPass::visit(ExprCond &node) { std::cout << "ExprCond\n"; }
 
 
 //
-void SemanticPass::setMainFunction(FuncDef *mainFunc) {
+
+void SemanticPass::declareFunctionHeader(Header *header) {}
+void SemanticPass::VerifyEntryPoint(const vec<uptr<ASTNode>> &defs) {
+    FuncDef *mainFunc = nullptr;
+    for (const auto &d: defs) {
+        if (auto *funcDef = dynamic_cast<FuncDef *>(d.get())) {
+            auto *header = funcDef->funcHeader();
+            if (header && header->identifier() == "main") {
+                mainFunc = funcDef;
+                break;
+            }
+        }
+    }
     if (!mainFunc) {
         semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, mainFunc->loc, "No 'main' function defined.");
+        throw std::runtime_error("semantic analysis failed");
     }
     mainFunc->setEntrypoint(true);
-    mainFunc->accept(*this);
     auto *header = mainFunc->funcHeader();
     if (!header) {
         semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, mainFunc->loc, "'main' function has no header.");
+        throw std::runtime_error("semantic analysis failed");
     }
     FuncSymbol *mainSymbol = header->symbol();
     if (!mainSymbol) {
         semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, mainFunc->loc, "'main' function has no associated symbol.");
+        throw std::runtime_error("semantic analysis failed");
     }
-    if (!mainSymbol->isProcedure()) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, mainFunc->loc, "'main' function must be a procedure with no return type.");
-    }
-    if (!mainSymbol->getParams().empty()) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, mainFunc->loc, "'main' function must not have parameters.");
-    }
+    // if (!mainSymbol->isProcedure()) {
+    //     semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, mainFunc->loc, "'main' function must be a procedure with no return type.");
+    // }
+    // if (!mainSymbol->getParams().empty()) {
+    //     semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, mainFunc->loc, "'main' function must not have parameters.");
+    // }
 }
 
 // Type resolution helper
@@ -115,12 +348,14 @@ bool SemanticPass::validateDimension(const std::optional<int> &dim, bool allowUn
             return true;
         } else {
             semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, loc, "Array dimension must be specified.");
-            return false;
+            // return false;
+            throw std::runtime_error("semantic analysis failed");
         }
     }
     if (*dim <= 0) {
         semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, loc, "Array dimension must be a positive integer.");
-        return false;
+        // return false;
+        throw std::runtime_error("semantic analysis failed");
     }
     return true;
 }
@@ -143,10 +378,12 @@ SemaTypePtr SemanticPass::scalarType(DataType::DataType dt) {
     switch (dt) {
         case DataType::DataType::INT:
             return makeIntType();
-        // case DataType::DataType::CHAR:
-        //     return makeCharType();
-        // case DataType::DataType::BOOL:
-        //     return makeBoolType();
+        case DataType::DataType::STRING:
+            return makeStrType();
+        case DataType::DataType::BOOL:
+            return makeBoolType();
+        case DataType::DataType::CHAR:
+            return makeCharType();
         case DataType::DataType::BYTE:
             return makeByteType();
         default:
@@ -184,7 +421,7 @@ bool SemanticPass::collectParams(const Header &header, std::vector<ParamInfo> &p
         auto parm_type = param->parameterType();
         if (!parm_type) {
             semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, param->loc, "Parameter in function '" + name + "' has no type.");
-            continue;
+            throw std::runtime_error("semantic analysis failed");
         }
         Symbol::ParamPass pass;
         auto resolvedType = resolveParamType(*parm_type, pass);
@@ -195,7 +432,7 @@ bool SemanticPass::collectParams(const Header &header, std::vector<ParamInfo> &p
         for (const auto &param_name: param->names()) {
             if (seen.insert(param_name).second == false) {
                 semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, param->loc, "Duplicate parameter name '" + param_name + "' in function '" + name + "'.");
-                continue;
+                throw std::runtime_error("semantic analysis failed");
             }
             ParamInfo pinfo;
             pinfo.name = param_name;

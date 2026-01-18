@@ -13,6 +13,18 @@ bool IntType::equals(const SemaType &other) const {
     return other.getKind() == TypeKind::INT;
 }
 
+bool BoolType::equals(const SemaType &other) const {
+    return other.getKind() == TypeKind::BOOL;
+}
+
+bool CharType::equals(const SemaType &other) const {
+    return other.getKind() == TypeKind::CHAR;
+}
+
+bool StrType::equals(const SemaType &other) const {
+    return other.getKind() == TypeKind::STR;
+}
+
 bool ByteType::equals(const SemaType &other) const {
     return other.getKind() == TypeKind::BYTE;
 }
@@ -124,6 +136,21 @@ namespace {
 
 SemaTypePtr makeIntType() {
     static SemaTypePtr instance = makeType<IntType>();
+    return instance;
+}
+
+SemaTypePtr makeBoolType() {
+    static SemaTypePtr instance = makeType<BoolType>();
+    return instance;
+}
+
+SemaTypePtr makeCharType() {
+    static SemaTypePtr instance = makeType<CharType>();
+    return instance;
+}
+
+SemaTypePtr makeStrType() {
+    static SemaTypePtr instance = makeType<StrType>();
     return instance;
 }
 

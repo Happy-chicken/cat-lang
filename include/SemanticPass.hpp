@@ -94,7 +94,8 @@ private:
     bool checkArguments(const vec<uptr<Expr>> &args, const std::vector<ParamSymbol *> &params, const std::string &callee, const Location &loc);
 
     //
-    void setMainFunction(FuncDef *mainFunc);
+    void declareFunctionHeader(Header *header);
+    void VerifyEntryPoint(const vec<uptr<ASTNode>> &defs);
 
 private:
     SemanticCtx &semanticCtx;

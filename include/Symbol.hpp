@@ -1,11 +1,11 @@
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
-
 #include "Location.hpp"
 #include "SemaType.hpp"
+#include <memory>
+#include <ostream>
+#include <string>
+#include <vector>
 
 class FuncSymbol;
 class Symbol {
@@ -37,6 +37,8 @@ public:
     void markForwardDeclaration();
     void markDefined();
     bool isDefined() const;
+
+    void dump(std::ostream &out) const;
 
 protected:
     Symbol(std::string name, SymKind kind, SemaTypePtr type, Location loc);

@@ -21,6 +21,7 @@ const unordered_map<string, TokenType> Scanner::keywords = {
     {"self", SELF},
 
     {"if", IF},
+    {"elif", ELIF},
     {"else", ELSE},
 
     {"for", FOR},
@@ -42,6 +43,7 @@ const unordered_map<string, TokenType> Scanner::keywords = {
     {"double", DOUBLE},
     {"bool", BOOL},
     {"str", STR},
+    {"char", CHAR},
     {"list", LIST},
     // TODO
     {"lambda", LAMBDA},
@@ -261,6 +263,9 @@ Token Scanner::String() {
 
     // Trim the surrounding quotes.
     string value = source.substr(start + 1, current - start - 2);
+    if (value.length() == 1) {
+        return makeToken(CHAR);
+    }
     return makeToken(STRING);
 }
 

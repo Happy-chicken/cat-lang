@@ -119,7 +119,7 @@ void Block::accept(AstVisitor &v) {
 Def::Def(Location l) : ASTNode(l) {
 }
 
-Program::Program(Location l, vec<uptr<Def>> ds)
+Program::Program(Location l, vec<uptr<ASTNode>> ds)
     : ASTNode(l), defs(std::move(ds)) {
 }
 

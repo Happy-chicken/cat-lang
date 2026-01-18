@@ -1,8 +1,11 @@
 // comment
-decl fun()
-def fun(a:int){
-
-}
+var a:int
+decl gfunc(a:int)
 def main() { 
-    
+    var b:int
+    var c:str
+    var d:char
+    a = 1
+    b = 1
+    //c = "sss"
 }

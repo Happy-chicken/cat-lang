@@ -19,6 +19,14 @@ public:
 
     std::size_t scopeDepth() const;
 
+    void dump(std::ostream &out) const {
+        for (std::size_t i = 0; i < symbols_.size(); ++i) {
+            out << "Symbol " << i << ": ";
+            symbols_[i]->dump(out);
+            out << "\n";
+        }
+    }
+
 private:
     vec<sptr<Scope>> scopes_;
     vec<uptr<Symbol>> symbols_;

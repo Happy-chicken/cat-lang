@@ -31,7 +31,7 @@ private:
     Token lastToken;
 
 private:
-    uptr<Def> parseDeclarations();
+    uptr<ASTNode> parseDeclarations();
     uptr<FuncDecl> parseFuncDecl();
     uptr<FuncDef> parseFuncDef();
     uptr<Header> parseHeader();
