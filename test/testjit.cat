@@ -1,13 +1,15 @@
 // comment
 //var a:int
 //decl gfunc(a:int)
-//def gfunc2(param: ref int) -> int{
-//    var aa:int
-//    return aa
-//}
+def gfunc2(param: ref int) -> int{
+    var aa:int
+    return aa
+}
 class A {
     var a:int
-    def method(){}
+    def method()->int{
+        return a
+    }
 }
 def main() { 
     //if (1==1) {
@@ -33,5 +35,8 @@ def main() {
     //c = d
     //e = [1, 2]
 
-    var instance:A 
+    var aa:A 
+    var b:int
+    b = aa.a
+    b = aa.method()
 }

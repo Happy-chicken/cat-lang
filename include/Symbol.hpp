@@ -3,12 +3,12 @@
 #include "AST.hpp"
 #include "Location.hpp"
 #include "SemaType.hpp"
-#include <memory>
 #include <ostream>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
+template<typename T>
+using vec = std::vector<T>;
 class FuncSymbol;
 class ClassSymbol;
 class Symbol {

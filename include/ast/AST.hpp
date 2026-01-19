@@ -9,6 +9,7 @@
 #include "Location.hpp"
 #include "Operator.hpp"
 #include "SemaType.hpp"
+#include "Symbol.hpp"
 #include "Types.hpp"
 
 using std::make_unique;
@@ -24,6 +25,7 @@ class AstVisitor;
 class Symbol;
 class FuncSymbol;
 class VarSymbol;
+class MethodSymbol;
 
 // Base AST Node class
 class ASTNode {
@@ -424,6 +426,23 @@ private:
     uptr<Expr> index;
 };
 
+// Member access as Lval (e.g., a.b on the left side of assignment)
+class MemberAccessLVal : public Lval {
+public:
+    MemberAccessLVal(Location l, uptr<Expr> obj, string member);
+    void print(std::ostream &out) const override;
+    void accept(AstVisitor &v) override;
+    Expr *object() const { return object_.get(); }
+    const string &memberName() const { return member_; }
+    Symbol *memberSymbol() const { return memberSymbol_; }
+    void setMemberSymbol(Symbol *sym) { memberSymbol_ = sym; }
+
+private:
+    uptr<Expr> object_;
+    string member_;
+    Symbol *memberSymbol_ = nullptr;
+};
+
 // ===== R-values =====
 
 class IntConst : public Rval {
@@ -501,6 +520,42 @@ private:
     vec<uptr<Expr>> args;
     // store associated symbol (callee)
     FuncSymbol *symbol_ = nullptr;
+};
+
+// Member access expression (e.g., a.b, a.func)
+class MemberAccessExpr : public Expr {
+public:
+    MemberAccessExpr(Location l, uptr<Expr> obj, string member);
+    void print(std::ostream &out) const override;
+    void accept(AstVisitor &v) override;
+    Expr *object() const { return object_.get(); }
+    const string &memberName() const { return member_; }
+    Symbol *memberSymbol() const { return memberSymbol_; }
+    void setMemberSymbol(Symbol *sym) { memberSymbol_ = sym; }
+
+private:
+    uptr<Expr> object_;
+    string member_;
+    Symbol *memberSymbol_ = nullptr;
+};
+
+// Method call expression (e.g., a.func(args))
+class MethodCall : public Expr {
+public:
+    MethodCall(Location l, uptr<Expr> obj, string method, vec<uptr<Expr>> args);
+    void print(std::ostream &out) const override;
+    void accept(AstVisitor &v) override;
+    Expr *object() const { return object_.get(); }
+    const string &methodName() const { return method_; }
+    const vec<uptr<Expr>> &arguments() const { return args; }
+    MethodSymbol *methodSymbol() const { return symbol_; }
+    void setMethodSymbol(MethodSymbol *sym) { symbol_ = sym; }
+
+private:
+    uptr<Expr> object_;
+    string method_;
+    vec<uptr<Expr>> args;
+    MethodSymbol *symbol_ = nullptr;
 };
 
 class UnaryExpr : public Expr {

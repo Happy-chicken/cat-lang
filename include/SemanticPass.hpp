@@ -45,6 +45,7 @@ public:
     void visit(IdLVal &node) override;
     void visit(StringLiteralLVal &node) override;
     void visit(IndexLVal &node) override;
+    void visit(MemberAccessLVal &node) override;
 
     void visit(IntConst &node) override;
     void visit(CharConst &node) override;
@@ -54,6 +55,8 @@ public:
     void visit(LValueExpr &node) override;
     void visit(ParenExpr &node) override;
     void visit(FuncCall &node) override;
+    void visit(MemberAccessExpr &node) override;
+    void visit(MethodCall &node) override;
     void visit(UnaryExpr &node) override;
     void visit(BinaryExpr &node) override;
     void visit(ExprCond &node) override;

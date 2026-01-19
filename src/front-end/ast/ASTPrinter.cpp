@@ -276,6 +276,11 @@ void IndexLVal::print(std::ostream &out) const {
     if (index) tree::child(out, index, ++k == n);
 }
 
+void MemberAccessLVal::print(std::ostream &out) const {
+    tree::line(out, tree::tag("MemberAccessLVal", loc) + " member=" + member_);
+    if (object_) tree::child(out, object_, true);
+}
+
 void IntConst::print(std::ostream &out) const {
     tree::line(out, tree::tag("IntConst", loc) + " value=" + std::to_string(value));
 }
@@ -296,6 +301,17 @@ void LValueExpr::print(std::ostream &out) const {
 void ParenExpr::print(std::ostream &out) const {
     tree::line(out, tree::tag("ParenExpr", loc));
     if (inner) tree::child(out, inner, true);
+}
+
+void MemberAccessExpr::print(std::ostream &out) const {
+    tree::line(out, tree::tag("MemberAccessExpr", loc) + " member=" + member_);
+    if (object_) tree::child(out, object_, true);
+}
+
+void MethodCall::print(std::ostream &out) const {
+    tree::line(out, tree::tag("MethodCall", loc) + " method=" + method_);
+    if (object_) tree::child(out, object_, false);
+    tree::children(out, args);
 }
 
 void FuncCall::print(std::ostream &out) const {

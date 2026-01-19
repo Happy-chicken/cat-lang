@@ -113,8 +113,8 @@ void SemanticPass::visit(ClassDef &node) {
             class_sym->addMethod(raw_method);
         }
     }
-    semanticCtx.declareSymbol(std::move(class_sym));
     semanticCtx.endScope();
+    semanticCtx.declareSymbol(std::move(class_sym));// declare class symbol in current scope
 }
 void SemanticPass::visit(FuncDecl &node) {
     auto *header = node.funcHeader();
@@ -317,7 +317,9 @@ void SemanticPass::visit(VarDef &node) {
                     Diagnostics::Severity::Error,
                     Diagnostics::Phase::SemanticAnalysis,
                     node.loc,
-                    "variable initialization type mismatch: declared type '" + typeToString(resolved_type) + "', but got '" + typeToString(init_type) + "'"
+                    "variable initialization type mismatch: declared type '" +
+                        typeToString(resolved_type) +
+                        "', but got '" + typeToString(init_type) + "'"
                 );
                 throw std::runtime_error("semantic analysis failed");
             }
@@ -592,7 +594,28 @@ void SemanticPass::visit(LValueExpr &node) {
 void SemanticPass::visit(IdLVal &node) {
     LookupResult lookup = semanticCtx.lookup(node.identifier());
     Symbol *symbol = lookup.symbol;
-    if (!lookup.found() || !(symbol->isVariable() || symbol->isParameter())) {
+
+    // If not found in current scope, check if it's in a method and look in class members
+    if (!lookup.found() || !(symbol->isVariable() || symbol->isParameter() || symbol->isField())) {
+        auto frame = semanticCtx.currentFunction();
+        if (frame && frame->symbol && frame->symbol->isMethod()) {
+            auto *methodSym = static_cast<MethodSymbol *>(frame->symbol);
+            auto *classSym = methodSym->definingClass();
+
+            if (classSym) {
+                // Search in class fields
+                const auto &fields = classSym->getFields();
+                for (auto *field: fields) {
+                    if (field->getName() == node.identifier()) {
+                        node.setSymbol(field);
+                        node.setType(field->getType());
+                        node.setAssignable(true);
+                        return;
+                    }
+                }
+            }
+        }
+
         semanticCtx.getDiagnostics().report(
             Diagnostics::Severity::Error,
             Diagnostics::Phase::SemanticAnalysis,
@@ -641,6 +664,68 @@ void SemanticPass::visit(IndexLVal &node) {
     node.setType(static_cast<const ArrayType *>(baseType.get())->elementType());
     node.setAssignable(base ? base->isAssignable() : true);
 }
+
+void SemanticPass::visit(MemberAccessLVal &node) {
+    auto *obj = node.object();
+    if (obj) {
+        obj->accept(*this);
+    }
+
+    auto objType = obj ? obj->type() : SemaTypePtr{};
+
+    // Check if object type is an instance of a class
+    if (!objType || objType->getKind() != SemaType::TypeKind::INST) {
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "cannot access member of non-class type"
+        );
+        node.setType(nullptr);
+        node.setAssignable(false);
+        throw std::runtime_error("semantic analysis failed");
+    }
+
+    // Get the class name and look up the class symbol
+    auto instType = static_cast<const InstanceType *>(objType.get());
+    auto classLookup = semanticCtx.lookup(instType->className());
+
+    if (!classLookup.found() || classLookup.symbol->getKind() != Symbol::SymKind::CLASS) {
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "class '" + instType->className() + "' not found"
+        );
+        node.setType(nullptr);
+        node.setAssignable(false);
+        throw std::runtime_error("semantic analysis failed");
+    }
+
+    auto *classSym = static_cast<ClassSymbol *>(classLookup.symbol);
+
+    // Look up the member in the class
+    const auto &fields = classSym->getFields();
+    for (auto *field: fields) {
+        if (field->getName() == node.memberName()) {
+            node.setMemberSymbol(field);
+            node.setType(field->getType());
+            node.setAssignable(true);
+            return;
+        }
+    }
+
+    semanticCtx.getDiagnostics().report(
+        Diagnostics::Severity::Error,
+        Diagnostics::Phase::SemanticAnalysis,
+        node.loc,
+        "member '" + node.memberName() + "' not found in class '" + instType->className() + "'"
+    );
+    node.setType(nullptr);
+    node.setAssignable(false);
+    throw std::runtime_error("semantic analysis failed");
+}
+
 void SemanticPass::visit(StringLiteralLVal &node) {
     // string is equivalent to array of chars in this Sematic analysis
     // str == char[]
@@ -673,6 +758,136 @@ void SemanticPass::visit(FuncCall &node) {
     const auto &params = funcSym->getParams();
     checkArguments(node.arguments(), params, node.identifier(), node.loc);
     const auto *sig = static_cast<const FuncType *>(funcSym->getType().get());
+    node.setType(sig ? sig->returnType() : SemaTypePtr{});
+    node.setLValue(false);
+    node.setAssignable(false);
+}
+
+void SemanticPass::visit(MemberAccessExpr &node) {
+    auto *obj = node.object();
+    if (obj) {
+        obj->accept(*this);
+    }
+
+    auto objType = obj ? obj->type() : SemaTypePtr{};
+
+    // Check if object type is an instance of a class
+    if (!objType || objType->getKind() != SemaType::TypeKind::INST) {
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "cannot access member of non-class type"
+        );
+        node.setType(nullptr);
+        node.setAssignable(false);
+        throw std::runtime_error("semantic analysis failed");
+    }
+
+    // Get the class name and look up the class symbol
+    auto instType = static_cast<const InstanceType *>(objType.get());
+    auto classLookup = semanticCtx.lookup(instType->className());
+
+    if (!classLookup.found() || classLookup.symbol->getKind() != Symbol::SymKind::CLASS) {
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "class '" + instType->className() + "' not found"
+        );
+        node.setType(nullptr);
+        node.setAssignable(false);
+        throw std::runtime_error("semantic analysis failed");
+    }
+
+    auto *classSym = static_cast<ClassSymbol *>(classLookup.symbol);
+
+    // Look up the member (field or method) in the class
+    const auto &fields = classSym->getFields();
+    for (auto *field: fields) {
+        if (field->getName() == node.memberName()) {
+            node.setMemberSymbol(field);
+            node.setType(field->getType());
+            node.setLValue(true);
+            node.setAssignable(true);
+            return;
+        }
+    }
+
+    semanticCtx.getDiagnostics().report(
+        Diagnostics::Severity::Error,
+        Diagnostics::Phase::SemanticAnalysis,
+        node.loc,
+        "member '" + node.memberName() + "' not found in class '" + instType->className() + "'"
+    );
+    node.setType(nullptr);
+    node.setAssignable(false);
+    throw std::runtime_error("semantic analysis failed");
+}
+
+void SemanticPass::visit(MethodCall &node) {
+    auto *obj = node.object();
+    if (obj) {
+        obj->accept(*this);
+    }
+
+    auto objType = obj ? obj->type() : SemaTypePtr{};
+
+    // Check if object type is an instance of a class
+    if (!objType || objType->getKind() != SemaType::TypeKind::INST) {
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "cannot call method on non-class type"
+        );
+        node.setType(nullptr);
+        throw std::runtime_error("semantic analysis failed");
+    }
+
+    // Get the class name and look up the class symbol
+    auto instType = static_cast<const InstanceType *>(objType.get());
+    auto classLookup = semanticCtx.lookup(instType->className());
+
+    if (!classLookup.found() || classLookup.symbol->getKind() != Symbol::SymKind::CLASS) {
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "class '" + instType->className() + "' not found"
+        );
+        node.setType(nullptr);
+        throw std::runtime_error("semantic analysis failed");
+    }
+
+    auto *classSym = static_cast<ClassSymbol *>(classLookup.symbol);
+
+    // Look up the method in the class
+    const auto &methods = classSym->getMethods();
+    MethodSymbol *methodSym = nullptr;
+    for (auto *method: methods) {
+        if (method->getName() == node.methodName()) {
+            methodSym = method;
+            break;
+        }
+    }
+
+    if (!methodSym) {
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "method '" + node.methodName() + "' not found in class '" + instType->className() + "'"
+        );
+        node.setType(nullptr);
+        throw std::runtime_error("semantic analysis failed");
+    }
+
+    node.setMethodSymbol(methodSym);
+    const auto &params = methodSym->getParams();
+    checkArguments(node.arguments(), params, node.methodName(), node.loc);
+
+    const auto *sig = static_cast<const FuncType *>(methodSym->getType().get());
     node.setType(sig ? sig->returnType() : SemaTypePtr{});
     node.setLValue(false);
     node.setAssignable(false);

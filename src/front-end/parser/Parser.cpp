@@ -265,13 +265,15 @@ uptr<Stmt> Parser::parseStmt() {
     if (check(IDENTIFIER)) {
         return parseAssignmentOrProcCall();
     }
-    throw error(peek(), "Unexpected statement.");
+    throw error(peek(), "Unexpected statement, ';' possible at end.");
 }
 uptr<Stmt> Parser::parseAssignmentOrProcCall() {
     auto loc = currentLocation();
     Token token = consume(IDENTIFIER, "Expect identifier.");
     // assigment
     uptr<Lval> left = make_unique<IdLVal>(token.location, token.lexeme);
+    // class member access
+
     // procedure call
     if (match({LEFT_PAREN})) {
         vec<uptr<Expr>> arguments;
@@ -337,11 +339,25 @@ uptr<Lval> Parser::parseLVal() {
         throw error(peek(), "Expected l-value");
     }
 
-    // Handle array indexing - [ comes before ]
-    while (match({RIGHT_BRACKET})) {
-        auto index = parseExpr();
-        consume(LEFT_BRACKET, "Expected ']'");
-        base = std::make_unique<IndexLVal>(loc, std::move(base), std::move(index));
+    // Handle suffixes: member access and array indexing
+    while (true) {
+        // member access: a.b.c
+        if (match({DOT})) {
+            Token memTok = consume(IDENTIFIER, "Expected member name after '.'");
+            auto objExpr = std::make_unique<LValueExpr>(loc, std::move(base));
+            base = std::make_unique<MemberAccessLVal>(loc, std::move(objExpr), memTok.lexeme);
+            continue;
+        }
+
+        // array indexing - [ comes before ] (grammar uses reversed tokens)
+        if (match({RIGHT_BRACKET})) {
+            auto index = parseExpr();
+            consume(LEFT_BRACKET, "Expected ']'");
+            base = std::make_unique<IndexLVal>(loc, std::move(base), std::move(index));
+            continue;
+        }
+
+        break;
     }
 
     return base;
@@ -487,29 +503,35 @@ uptr<Expr> Parser::parsePrimary() {
         return std::make_unique<ParenExpr>(loc, std::move(expr));
     }
 
-    // Function call or l-value
+    // Identifier-led expressions: variable, function call, member access, method call
     if (check(IDENTIFIER)) {
-        Token token = advance();
+        Token idTok = advance();
+        uptr<Expr> expr;
 
-        // Check if it's a function call
+        // function call f(...)
         if (match({LEFT_PAREN})) {
             auto args = parseArguments();
             consume(RIGHT_PAREN, "Expected ')'");
-            return std::make_unique<FuncCall>(loc, token.lexeme, std::move(args));
+            expr = std::make_unique<FuncCall>(loc, idTok.lexeme, std::move(args));
+        } else {
+            // base l-value
+            uptr<Lval> lval = std::make_unique<IdLVal>(loc, idTok.lexeme);
+            expr = std::make_unique<LValueExpr>(loc, std::move(lval));
         }
 
-        // It's an l-value, possibly with indexing
-        uptr<Lval> lval;
-        lval = std::make_unique<IdLVal>(loc, token.lexeme);
-
-        // Handle array indexing
-        while (match({RIGHT_BRACKET})) {
-            auto index = parseExpr();
-            consume(LEFT_BRACKET, "Expected ']'");
-            lval = std::make_unique<IndexLVal>(loc, std::move(lval), std::move(index));
+        // suffix chain: .member, .method(...)
+        while (match({DOT})) {
+            Token memTok = consume(IDENTIFIER, "Expected member name after '.'");
+            if (match({LEFT_PAREN})) {
+                auto args = parseArguments();
+                consume(RIGHT_PAREN, "Expected ')'");
+                expr = std::make_unique<MethodCall>(loc, std::move(expr), memTok.lexeme, std::move(args));
+            } else {
+                expr = std::make_unique<MemberAccessExpr>(loc, std::move(expr), memTok.lexeme);
+            }
         }
 
-        return std::make_unique<LValueExpr>(loc, std::move(lval));
+        return expr;
     }
 
     // String literal as l-value

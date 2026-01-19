@@ -306,6 +306,12 @@ void IndexLVal::accept(AstVisitor &v) {
     v.visit(*this);
 }
 
+MemberAccessLVal::MemberAccessLVal(Location l, uptr<Expr> obj, string member)
+    : Lval(l), object_(std::move(obj)), member_(member) {}
+void MemberAccessLVal::accept(AstVisitor &v) {
+    v.visit(*this);
+}
+
 // ===== R-values / expressions =====
 
 IntConst::IntConst(Location l, int v)
@@ -347,6 +353,18 @@ void ParenExpr::accept(AstVisitor &v) {
 FuncCall::FuncCall(Location l, string id, vec<uptr<Expr>> a)
     : Expr(l), name(std::move(id)), args(std::move(a)) {}
 void FuncCall::accept(AstVisitor &v) {
+    v.visit(*this);
+}
+
+MemberAccessExpr::MemberAccessExpr(Location l, uptr<Expr> obj, string member)
+    : Expr(l), object_(std::move(obj)), member_(member) {}
+void MemberAccessExpr::accept(AstVisitor &v) {
+    v.visit(*this);
+}
+
+MethodCall::MethodCall(Location l, uptr<Expr> obj, string method, vec<uptr<Expr>> args)
+    : Expr(l), object_(std::move(obj)), method_(method), args(std::move(args)) {}
+void MethodCall::accept(AstVisitor &v) {
     v.visit(*this);
 }
 
