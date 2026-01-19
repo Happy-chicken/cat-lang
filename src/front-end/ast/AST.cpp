@@ -191,6 +191,10 @@ bool FuncDef::isEntrypoint() {
     return isEntrypoint_;
 }
 
+bool FuncDef::isMethod() {
+    return isMethod_;
+}
+
 void FuncDef::setEntrypoint(bool cond) {
     isEntrypoint_ = cond;
 }

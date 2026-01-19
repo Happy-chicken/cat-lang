@@ -114,6 +114,8 @@ private:
 
     //
     void declareFunctionHeader(Header *header);
+    void declareGlobalVariable(VarDef *varDef);
+    void declareClassDefinition(ClassDef *classDef);
     void VerifyEntryPoint(const vec<uptr<ASTNode>> &defs);
 
 private:

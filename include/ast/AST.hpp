@@ -243,6 +243,7 @@ public:
     Block *funcBody() const { return body.get(); }
     void print(std::ostream &out) const override;
     bool isEntrypoint();
+    bool isMethod();
     void setEntrypoint(bool cond);
 
 private:
@@ -250,6 +251,7 @@ private:
     vec<uptr<Def>> locals;
     uptr<Block> body;
     bool isEntrypoint_;
+    bool isMethod_;
 };
 
 class ClassDef : public Def {

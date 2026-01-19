@@ -181,10 +181,15 @@ void FuncDef::print(std::ostream &out) const {
 
 void ClassDef::print(std::ostream &out) const {
     tree::line(out, tree::tag("ClassDef", loc) + " name=" + name);
-    tree::line(out, "Fields:");
-    tree::children(out, fields);
-    tree::line(out, "Methods:");
-    tree::children(out, methods);
+
+    int n = static_cast<int>(fields.size()) + static_cast<int>(methods.size());
+    int k = 0;
+    for (std::size_t i = 0; i < fields.size(); ++i) {
+        tree::child(out, fields[i], ++k == n);
+    }
+    for (std::size_t i = 0; i < methods.size(); ++i) {
+        tree::child(out, methods[i], ++k == n);
+    }
 }
 
 void SkipStmt::print(std::ostream &out) const { tree::line(out, tree::tag("SkipStmt", loc)); }
