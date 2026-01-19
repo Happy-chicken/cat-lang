@@ -6,7 +6,7 @@
 //    return aa
 //}
 class A {
-    //var a:int
+    var a:int
     def method(){}
 }
 def main() { 

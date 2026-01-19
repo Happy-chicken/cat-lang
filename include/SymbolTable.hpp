@@ -10,6 +10,7 @@ public:
 
     InsertResult declare(uptr<Symbol> symbol);
     LookupResult lookup(const std::string &name) const;
+    bool replaceSymbol(const std::string &name, uptr<Symbol> newSymbol);
 
     void beginScope();
     void endScope();

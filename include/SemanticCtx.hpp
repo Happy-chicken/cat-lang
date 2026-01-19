@@ -22,6 +22,7 @@ public:
     InsertResult declareSymbol(uptr<Symbol> sym, bool isRedeclared = false);
     LookupResult lookup(const string &name) const;
     LookupResult lookupLocalSymbol(const string &name) const;
+    bool replaceSymbol(const string &name, uptr<Symbol> newSymbol);
 
     struct FunctionFrame {
         FuncSymbol *symbol = nullptr;

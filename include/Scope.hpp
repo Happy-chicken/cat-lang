@@ -20,6 +20,7 @@ public:
     InsertResult declare(Symbol *symbol);
     LookupResult lookup(const string &name) const;
     LookupResult lookupLocal(const string &name) const;
+    bool replace(const string &name, Symbol *newSymbol);
 
     // TODO
     FuncSymbol *getEnclosingFunction() const { return nullptr; }

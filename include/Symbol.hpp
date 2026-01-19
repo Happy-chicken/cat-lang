@@ -10,13 +10,16 @@
 #include <vector>
 
 class FuncSymbol;
+class ClassSymbol;
 class Symbol {
 public:
     enum class SymKind {
         VAR,
         PARAM,
         FUNC,
-        CLASS
+        CLASS,
+        METHOD,// Function defined in a class
+        FIELD  // Variable defined in a class
     };
 
     enum class ParamPass {
@@ -34,8 +37,13 @@ public:
     FuncSymbol *definingFunc() const;
     void setDefiningFunc(FuncSymbol *f);
 
+    ClassSymbol *definingClass() const;
+    void setDefiningClass(ClassSymbol *c);
+
     bool isVariable() const;
     bool isParameter() const;
+    bool isMethod() const;
+    bool isField() const;
     void markForwardDeclaration();
     void markDefined();
     bool isDefined() const;
@@ -51,6 +59,7 @@ private:
     SemaTypePtr type_;
     Location loc_;
     FuncSymbol *definingFunc_ = nullptr;
+    ClassSymbol *definingClass_ = nullptr;
     bool isForward_ = false;
     bool isDefined_ = false;
 };
@@ -59,6 +68,13 @@ class VarSymbol : public Symbol {
 public:
     VarSymbol(std::string name, SemaTypePtr type, Location loc)
         : Symbol(std::move(name), SymKind::VAR, std::move(type), loc) {};
+};
+
+// Field is a variable defined in a class
+class FieldSymbol : public Symbol {
+public:
+    FieldSymbol(std::string name, SemaTypePtr type, Location loc)
+        : Symbol(std::move(name), SymKind::FIELD, std::move(type), loc) {};
 };
 
 class ParamSymbol : public Symbol {
@@ -82,9 +98,21 @@ public:
     bool isProcedure() const;
     void clearParams();
 
+protected:
+    // Protected constructor for derived classes (e.g., MethodSymbol)
+    FuncSymbol(std::string name, SymKind kind, SemaTypePtr sigType, bool isProc, Location loc)
+        : Symbol(std::move(name), kind, std::move(sigType), loc), isProcedure_(isProc) {};
+
 private:
     std::vector<ParamSymbol *> params_;
     bool isProcedure_;
+};
+
+// Method is a function defined in a class (has implicit 'this' parameter)
+class MethodSymbol : public FuncSymbol {
+public:
+    MethodSymbol(std::string name, SemaTypePtr sigType, bool isProc, Location loc)
+        : FuncSymbol(std::move(name), SymKind::METHOD, sigType, isProc, loc) {}
 };
 
 class ClassSymbol : public Symbol {
@@ -92,16 +120,16 @@ public:
     using MemberMap = std::unordered_map<std::string, Symbol *>;
     ClassSymbol(std::string name, SemaTypePtr classType, Location loc)
         : Symbol(std::move(name), SymKind::CLASS, std::move(classType), loc) {};
-    void addField(VarSymbol *field) {
+    void addField(FieldSymbol *field) {
         fields_.push_back(field);
         memberMap_[field->getName()] = field;
     }
-    void addMethod(FuncSymbol *method) {
+    void addMethod(MethodSymbol *method) {
         methods_.push_back(method);
         memberMap_[method->getName()] = method;
     }
-    const vec<VarSymbol *> &getFields() const { return fields_; }
-    const vec<FuncSymbol *> &getMethods() const { return methods_; }
+    const vec<FieldSymbol *> &getFields() const { return fields_; }
+    const vec<MethodSymbol *> &getMethods() const { return methods_; }
     void clearAll() {
         fields_.clear();
         methods_.clear();
@@ -109,8 +137,8 @@ public:
     }
 
 private:
-    vec<VarSymbol *> fields_;
-    vec<FuncSymbol *> methods_;
+    vec<FieldSymbol *> fields_;
+    vec<MethodSymbol *> methods_;
     MemberMap memberMap_;
     std::optional<std::string> baseClassName_;
 };

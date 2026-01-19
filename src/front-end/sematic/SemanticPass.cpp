@@ -25,19 +25,7 @@ void SemanticPass::visit(FuncParameterType &node) {
 void SemanticPass::visit(Program &node) {
     // program entry point
     auto &defs = node.getDefs();
-    // first pass: collect function declareation and class definitions
-    for (const auto &d: defs) {
-        if (auto *classDef = dynamic_cast<ClassDef *>(d.get())) {
-            declareClassDefinition(classDef);
-        } else if (auto *varDef = dynamic_cast<VarDef *>(d.get())) {
-            // declareGlobalVariable(varDef);
-        } else if (auto *funcDef = dynamic_cast<FuncDef *>(d.get())) {
-            // ddeclareFunctionHeader(funcDef->funcHeader());
-        } else if (auto *funcDecl = dynamic_cast<FuncDecl *>(d.get())) {
-            declareFunctionHeader(funcDecl->funcHeader());
-        }
-    }
-    // second pass: visit all definitions
+    //  pass 1: visit all definitions
     for (const auto &d: defs) {
         d->accept(*this);
     }
@@ -74,15 +62,55 @@ void SemanticPass::visit(ClassDef &node) {
     for (auto &member: fields) {
         if (member) member->accept(*this);
 
-        // get created var sym and add them to class symbol
-        for (auto *mem_sym: member->symbols()) {
-            if (mem_sym) class_sym->addField(mem_sym);
+        // Convert VarSymbols to FieldSymbols for class members
+        for (auto *var_sym: member->symbols()) {
+            if (var_sym) {
+                // Create a FieldSymbol with the same properties
+                auto field_sym = std::make_unique<FieldSymbol>(
+                    var_sym->getName(),
+                    var_sym->getType(),
+                    var_sym->getLocation()
+                );
+                field_sym->setDefiningClass(class_sym.get());
+                FieldSymbol *raw_field = field_sym.get();
+
+                // Replace the VarSymbol with FieldSymbol in symbol table
+                semanticCtx.replaceSymbol(var_sym->getName(), std::move(field_sym));
+                class_sym->addField(raw_field);
+            }
         }
     }
     for (auto &method: methods) {
         if (method) method->accept(*this);
-        if (auto *method_sym = method->funcHeader()->symbol()) {
-            class_sym->addMethod(method_sym);
+        auto *func_header = method->funcHeader();
+        if (func_header && func_header->symbol()) {
+            auto *func_sym = func_header->symbol();
+
+            // Create a MethodSymbol with the same properties
+            auto method_sym = std::make_unique<MethodSymbol>(
+                func_sym->getName(),
+                func_sym->getType(),
+                func_sym->isProcedure(),
+                func_sym->getLocation()
+            );
+
+            // Copy parameters from FuncSymbol to MethodSymbol
+            for (auto *param: func_sym->getParams()) {
+                method_sym->addParam(param);
+            }
+
+            method_sym->setDefiningClass(class_sym.get());
+            if (func_sym->isDefined()) {
+                method_sym->markDefined();
+            }
+
+            MethodSymbol *raw_method = method_sym.get();
+
+            // Replace the FuncSymbol with MethodSymbol in symbol table
+            semanticCtx.replaceSymbol(func_sym->getName(), std::move(method_sym));
+            // Update the AST node to point to the new MethodSymbol
+            func_header->setSymbol(raw_method);
+            class_sym->addMethod(raw_method);
         }
     }
     semanticCtx.declareSymbol(std::move(class_sym));
@@ -683,13 +711,6 @@ void SemanticPass::visit(ExprCond &node) {
     node.setType(makeBoolType());
 }
 
-
-//
-
-void SemanticPass::declareFunctionHeader(Header *header) {}
-void SemanticPass::declareGlobalVariable(VarDef *varDef) {}
-void SemanticPass::declareClassDefinition(ClassDef *classDef) {
-}
 void SemanticPass::VerifyEntryPoint(const vec<uptr<ASTNode>> &defs) {
     FuncDef *mainFunc = nullptr;
     for (const auto &d: defs) {

@@ -40,6 +40,30 @@ LookupResult SymbolTable::lookup(const std::string &name) const {
     return currentScope().lookup(name);
 }
 
+bool SymbolTable::replaceSymbol(const std::string &name, uptr<Symbol> newSymbol) {
+    if (!newSymbol) {
+        return false;
+    }
+    // Look up the old symbol in current scope
+    auto result = currentScope().lookup(name);
+    if (!result.found()) {
+        return false;
+    }
+
+    Symbol *oldSymPtr = result.symbol;
+    Symbol *newSymPtr = newSymbol.get();
+    string oldName = oldSymPtr->getName();
+    // Find and replace the old symbol in the symbols_ vector
+    for (auto &sym: symbols_) {
+        if (sym.get() == oldSymPtr) {
+            sym = std::move(newSymbol);
+            break;
+        }
+    }
+    // Replace the pointer in the current scope
+    return currentScope().replace(oldName, newSymPtr);
+}
+
 std::size_t SymbolTable::scopeDepth() const {
     return scopes_.size();
 }

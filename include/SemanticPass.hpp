@@ -113,9 +113,6 @@ private:
     bool checkArguments(const vec<uptr<Expr>> &args, const std::vector<ParamSymbol *> &params, const std::string &callee, const Location &loc);
 
     //
-    void declareFunctionHeader(Header *header);
-    void declareGlobalVariable(VarDef *varDef);
-    void declareClassDefinition(ClassDef *classDef);
     void VerifyEntryPoint(const vec<uptr<ASTNode>> &defs);
 
 private:

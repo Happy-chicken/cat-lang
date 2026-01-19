@@ -36,3 +36,13 @@ LookupResult Scope::lookup(const string &name) const {
     }
     return LookupResult::notFound();
 }
+
+// replace a symbol in the current scope
+bool Scope::replace(const string &name, Symbol *newSymbol) {
+    auto it = symbolTable_.find(name);
+    if (it == symbolTable_.end()) {
+        return false;// Symbol not found in current scope
+    }
+    symbolTable_[name] = newSymbol;
+    return true;
+}

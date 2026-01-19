@@ -29,6 +29,10 @@ LookupResult SemanticCtx::lookupLocalSymbol(const string &name) const {
     return symbol_table.currentScope().lookupLocal(name);
 }
 
+bool SemanticCtx::replaceSymbol(const string &name, uptr<Symbol> newSymbol) {
+    return symbol_table.replaceSymbol(name, std::move(newSymbol));
+}
+
 void SemanticCtx::enterFunction(sptr<FunctionFrame> frame) {
     function_stack.push_back(frame);
 }

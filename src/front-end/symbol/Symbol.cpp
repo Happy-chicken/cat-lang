@@ -33,12 +33,28 @@ void Symbol::setDefiningFunc(FuncSymbol *f) {
     definingFunc_ = f;
 }
 
+ClassSymbol *Symbol::definingClass() const {
+    return definingClass_;
+}
+
+void Symbol::setDefiningClass(ClassSymbol *c) {
+    definingClass_ = c;
+}
+
 bool Symbol::isVariable() const {
     return kind_ == SymKind::VAR;
 }
 
 bool Symbol::isParameter() const {
     return kind_ == SymKind::PARAM;
+}
+
+bool Symbol::isMethod() const {
+    return kind_ == SymKind::METHOD;
+}
+
+bool Symbol::isField() const {
+    return kind_ == SymKind::FIELD;
 }
 
 void Symbol::markForwardDeclaration() {
@@ -89,6 +105,12 @@ void Symbol::dump(std::ostream &out) const {
             break;
         case SymKind::CLASS:
             out << "CLASS";
+            break;
+        case SymKind::METHOD:
+            out << "METHOD";
+            break;
+        case SymKind::FIELD:
+            out << "MEMBER";
             break;
     }
     out << ", type=";
