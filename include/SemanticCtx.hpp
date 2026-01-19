@@ -19,7 +19,7 @@ public:
     std::size_t scopeDepth() const { return symbol_table.scopeDepth(); }
     bool hasErrors() const { return diagnostics.hasErrors(); }
 
-    InsertResult declareSymbol(uptr<Symbol> sym, bool isRedeclared = true);
+    InsertResult declareSymbol(uptr<Symbol> sym, bool isRedeclared = false);
     LookupResult lookup(const string &name) const;
     LookupResult lookupLocalSymbol(const string &name) const;
 

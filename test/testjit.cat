@@ -6,7 +6,7 @@
 //    return aa
 //}
 class A {
-    var a:int
+    //var a:int
     def method(){}
 }
 def main() { 
@@ -33,5 +33,5 @@ def main() {
     //c = d
     //e = [1, 2]
 
-    var a:bool = 1+1
+    var instance:A 
 }

@@ -16,6 +16,7 @@ public:
         ARRAY,
         FUNC,
         CLS,
+        INST,
         VOID
     };
 
@@ -23,39 +24,7 @@ public:
     TypeKind getKind() const;
     virtual bool equals(const SemaType &other) const = 0;// for type-checking
 
-    void dump(std::ostream &out) const {
-        out << "SemaType(kind=";
-        switch (kind_) {
-            case TypeKind::INT:
-                out << "INT";
-                break;
-            case TypeKind::CHAR:
-                out << "CHAR";
-                break;
-            case TypeKind::BOOL:
-                out << "BOOL";
-                break;
-            case TypeKind::BYTE:
-                out << "BYTE";
-                break;
-            case TypeKind::STR:
-                out << "STR";
-                break;
-            case TypeKind::ARRAY:
-                out << "ARRAY";
-                break;
-            case TypeKind::FUNC:
-                out << "FUNC";
-                break;
-            case TypeKind::CLS:
-                out << "CLS";
-                break;
-            case TypeKind::VOID:
-                out << "VOID";
-                break;
-        }
-        out << ")";
-    }
+    void dump(std::ostream &out) const;
 
 protected:
     explicit SemaType(TypeKind kind);
@@ -153,6 +122,29 @@ public:
     bool equals(const SemaType &other) const override;
 };
 
+// ----------- Class type ---------------------------------------------------------
+
+class ClassType : public SemaType {
+public:
+    ClassType(const std::string &className);
+    const std::string &className() const;
+    bool equals(const SemaType &other) const override;
+
+private:
+    std::string className_;
+};
+
+class InstanceType : public SemaType {
+public:
+    InstanceType(const std::string &className);
+    const std::string &className() const;
+    bool equals(const SemaType &other) const override;
+    void setClassName(const std::string &name);
+
+private:
+    std::string className_;
+};
+
 SemaTypePtr makeIntType();
 SemaTypePtr makeBoolType();
 SemaTypePtr makeCharType();
@@ -161,3 +153,5 @@ SemaTypePtr makeByteType();
 SemaTypePtr makeVoidType();
 SemaTypePtr makeArrayType(SemaTypePtr elementType, std::optional<std::size_t> size);
 SemaTypePtr makeFuncType(SemaTypePtr returnType, std::vector<SemaTypePtr> params);
+SemaTypePtr makeClassType(const std::string &className);
+SemaTypePtr makeInstanceType(const std::string &className = "");

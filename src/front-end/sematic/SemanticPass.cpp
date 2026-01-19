@@ -45,7 +45,49 @@ void SemanticPass::visit(Program &node) {
     VerifyEntryPoint(defs);
 }
 void SemanticPass::visit(Header &node) {}
-void SemanticPass::visit(ClassDef &node) { std::cout << "ClassDef\n"; }
+void SemanticPass::visit(ClassDef &node) {
+    auto cls_name = node.identifier();
+    const auto &fields = node.fieldList();
+    const auto &methods = node.methodList();
+    const SemaTypePtr class_type = makeClassType(cls_name);
+
+    LookupResult existing = semanticCtx.lookup(cls_name);
+    Symbol *symbol = existing.symbol;
+    if (existing.found()) {
+        if (symbol->isDefined()) {
+            semanticCtx.getDiagnostics().report(
+                Diagnostics::Severity::Error,
+                Diagnostics::Phase::SemanticAnalysis,
+                node.loc,
+                "class '" + cls_name + "' already defined"
+            );
+            throw std::runtime_error("semantic analysis failed");
+        }
+    }
+
+    // create class symbol
+    auto class_sym = std::make_unique<ClassSymbol>(cls_name, class_type, node.loc);
+
+
+    // create Class
+    semanticCtx.beginScope();
+    for (auto &member: fields) {
+        if (member) member->accept(*this);
+
+        // get created var sym and add them to class symbol
+        for (auto *mem_sym: member->symbols()) {
+            if (mem_sym) class_sym->addField(mem_sym);
+        }
+    }
+    for (auto &method: methods) {
+        if (method) method->accept(*this);
+        if (auto *method_sym = method->funcHeader()->symbol()) {
+            class_sym->addMethod(method_sym);
+        }
+    }
+    semanticCtx.declareSymbol(std::move(class_sym));
+    semanticCtx.endScope();
+}
 void SemanticPass::visit(FuncDecl &node) {
     auto *header = node.funcHeader();
     if (!header) {
@@ -67,16 +109,31 @@ void SemanticPass::visit(FuncDecl &node) {
     // Check for existing declaration
     auto existing = semanticCtx.lookupLocalSymbol(name);
     Symbol *symbol = existing.symbol;
-    if (symbol) {
+    if (existing.found()) {
         if (!signaturesMatch(isProcedure, returnType, params, symbol)) {
-            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "forward declaration of '" + name + "' conflicts with previous declaration");
+            semanticCtx.getDiagnostics().report(
+                Diagnostics::Severity::Error,
+                Diagnostics::Phase::SemanticAnalysis,
+                node.loc,
+                "forward declaration of '" + name + "' conflicts with previous declaration"
+            );
             throw std::runtime_error("semantic analysis failed");
         }
         if (symbol->isDefined()) {
-            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "symbol '" + name + "' already defined");
+            semanticCtx.getDiagnostics().report(
+                Diagnostics::Severity::Error,
+                Diagnostics::Phase::SemanticAnalysis,
+                node.loc,
+                "symbol '" + name + "' already defined"
+            );
             throw std::runtime_error("semantic analysis failed");
         }
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Info, Diagnostics::Phase::SemanticAnalysis, symbol->getLocation(), "previous declaration here");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Info,
+            Diagnostics::Phase::SemanticAnalysis,
+            symbol->getLocation(),
+            "previous declaration here"
+        );
         header->setSymbol(static_cast<FuncSymbol *>(symbol));
         throw std::runtime_error("semantic analysis failed");
     }
@@ -135,11 +192,21 @@ void SemanticPass::visit(FuncDef &node) {
 
     if (existing.found()) {
         if (!signaturesMatch(isProcedure, returnType, params, symbol)) {
-            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "definition of '" + name + "' does not match prior declaration");
+            semanticCtx.getDiagnostics().report(
+                Diagnostics::Severity::Error,
+                Diagnostics::Phase::SemanticAnalysis,
+                node.loc,
+                "definition of '" + name + "' does not match prior declaration"
+            );
             throw std::runtime_error("semantic analysis failed");
         }
         if (symbol->isDefined()) {
-            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "redefinition of '" + name + "'");
+            semanticCtx.getDiagnostics().report(
+                Diagnostics::Severity::Error,
+                Diagnostics::Phase::SemanticAnalysis,
+                node.loc,
+                "redefinition of '" + name + "'"
+            );
             throw std::runtime_error("semantic analysis failed");
         }
         wasForwardDeclared = true;
@@ -207,7 +274,7 @@ void SemanticPass::visit(VarDef &node) {
     if (!typeNode) {
         return;
     }
-    auto resolved_type = resolveType(*typeNode);
+    SemaTypePtr resolved_type = resolveType(*typeNode);
     if (!resolved_type) {
         return;
     }
@@ -218,7 +285,12 @@ void SemanticPass::visit(VarDef &node) {
             rawptr->accept(*this);
             auto init_type = rawptr->type();
             if (!typesEqual(resolved_type, init_type)) {
-                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "variable initialization type mismatch: declared type '" + typeToString(resolved_type) + "', but got '" + typeToString(init_type) + "'");
+                semanticCtx.getDiagnostics().report(
+                    Diagnostics::Severity::Error,
+                    Diagnostics::Phase::SemanticAnalysis,
+                    node.loc,
+                    "variable initialization type mismatch: declared type '" + typeToString(resolved_type) + "', but got '" + typeToString(init_type) + "'"
+                );
                 throw std::runtime_error("semantic analysis failed");
             }
         }
@@ -287,7 +359,12 @@ void SemanticPass::visit(ReturnStmt &node) {
         return;
     }
     if (!typesEqual(frame->return_type, value->type())) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "return type mismatch: expected '" + typeToString(frame->return_type) + "' but got '" + typeToString(value->type()) + "'");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "return type mismatch: expected '" + typeToString(frame->return_type) + "' but got '" + typeToString(value->type()) + "'"
+        );
         throw std::runtime_error("semantic analysis failed");
     }
 }
@@ -303,19 +380,38 @@ void SemanticPass::visit(AssignStmt &node) {
     auto leftType = lhs ? lhs->type() : SemaTypePtr{};
     auto rightType = rhs ? rhs->type() : SemaTypePtr{};
     if (!leftType) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "invalid assignment target");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis, node.loc,
+            "invalid assignment target"
+        );
         throw std::runtime_error("semantic analysis failed");
     }
     if (isArrayType(leftType)) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "cannot assign to an array value");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "cannot assign to an array value"
+        );
         throw std::runtime_error("semantic analysis failed");
     }
     if (lhs && !lhs->isAssignable()) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "left-hand side of assignment is not assignable");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "left-hand side of assignment is not assignable"
+        );
         throw std::runtime_error("semantic analysis failed");
     }
     if (!typesEqual(leftType, rightType)) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "assignment type mismatch: left is '" + typeToString(leftType) + "', right is '" + typeToString(rightType) + "'");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "assignment type mismatch: left is '" + typeToString(leftType) + "', right is '" + typeToString(rightType) + "'"
+        );
         throw std::runtime_error("semantic analysis failed");
     }
 }
@@ -329,7 +425,12 @@ void SemanticPass::visit(ProcCall &node) {
                         ? static_cast<FuncSymbol *>(symbol)
                         : nullptr;
     if (!funcSym || !funcSym->isProcedure()) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "unknown procedure '" + node.identifier() + "'");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "unknown procedure '" + node.identifier() + "'"
+        );
         node.setFuncSymbol(nullptr);
         throw std::runtime_error("semantic analysis failed");
     }
@@ -357,7 +458,12 @@ void SemanticPass::visit(BinaryExpr &node) {
         case BinOp::Mod:
             if (!typesEqual(leftType, rightType) ||
                 !(isIntType(leftType) || isByteType(leftType))) {
-                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "arithmetic operands must both be int or byte");
+                semanticCtx.getDiagnostics().report(
+                    Diagnostics::Severity::Error,
+                    Diagnostics::Phase::SemanticAnalysis,
+                    node.loc,
+                    "arithmetic operands must both be int or byte"
+                );
                 throw std::runtime_error("semantic analysis failed");
             }
             node.setType(leftType);
@@ -365,7 +471,12 @@ void SemanticPass::visit(BinaryExpr &node) {
         case BinOp::AndBits:
         case BinOp::OrBits:
             if (!isByteType(leftType) || !typesEqual(leftType, rightType)) {
-                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "'&' and '|' require byte operands");
+                semanticCtx.getDiagnostics().report(
+                    Diagnostics::Severity::Error,
+                    Diagnostics::Phase::SemanticAnalysis,
+                    node.loc,
+                    "'&' and '|' require byte operands"
+                );
                 throw std::runtime_error("semantic analysis failed");
             }
             node.setType(makeByteType());
@@ -373,7 +484,12 @@ void SemanticPass::visit(BinaryExpr &node) {
         case BinOp::And:
         case BinOp::Or:
             if (!isBoolType(leftType) || !typesEqual(leftType, rightType)) {
-                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "'and' and 'or' require bool operands");
+                semanticCtx.getDiagnostics().report(
+                    Diagnostics::Severity::Error,
+                    Diagnostics::Phase::SemanticAnalysis,
+                    node.loc,
+                    "'and' and 'or' require bool operands"
+                );
                 throw std::runtime_error("semantic analysis failed");
             }
             node.setType(makeBoolType());
@@ -386,7 +502,12 @@ void SemanticPass::visit(BinaryExpr &node) {
         case BinOp::Le:
             if (!typesEqual(leftType, rightType) ||
                 !(isIntType(leftType) || isByteType(leftType))) {
-                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "comparison operands must both be int or byte");
+                semanticCtx.getDiagnostics().report(
+                    Diagnostics::Severity::Error,
+                    Diagnostics::Phase::SemanticAnalysis,
+                    node.loc,
+                    "comparison operands must both be int or byte"
+                );
                 throw std::runtime_error("semantic analysis failed");
             }
             node.setType(makeBoolType());
@@ -405,14 +526,24 @@ void SemanticPass::visit(UnaryExpr &node) {
         case UnOp::Plus:
         case UnOp::Minus:
             if (!isIntType(operandType)) {
-                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "unary '+' and '-' require int operand");
+                semanticCtx.getDiagnostics().report(
+                    Diagnostics::Severity::Error,
+                    Diagnostics::Phase::SemanticAnalysis,
+                    node.loc,
+                    "unary '+' and '-' require int operand"
+                );
                 throw std::runtime_error("semantic analysis failed");
             }
             node.setType(makeIntType());
             break;
         case UnOp::Not:
             if (!isBoolType(operandType)) {
-                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "'!' requires byte operand");
+                semanticCtx.getDiagnostics().report(
+                    Diagnostics::Severity::Error,
+                    Diagnostics::Phase::SemanticAnalysis,
+                    node.loc,
+                    "'!' requires byte operand"
+                );
                 throw std::runtime_error("semantic analysis failed");
             }
             node.setType(makeBoolType());
@@ -434,7 +565,12 @@ void SemanticPass::visit(IdLVal &node) {
     LookupResult lookup = semanticCtx.lookup(node.identifier());
     Symbol *symbol = lookup.symbol;
     if (!lookup.found() || !(symbol->isVariable() || symbol->isParameter())) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "unknown variable '" + node.identifier() + "'");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "unknown variable '" + node.identifier() + "'"
+        );
         node.setType(nullptr);
         node.setAssignable(false);
         node.setSymbol(nullptr);
@@ -455,13 +591,23 @@ void SemanticPass::visit(IndexLVal &node) {
     }
     auto baseType = base ? base->type() : SemaTypePtr{};
     if (!isArrayType(baseType)) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "cannot index non-array value");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "cannot index non-array value"
+        );
         node.setType(nullptr);
         node.setAssignable(false);
         throw std::runtime_error("semantic analysis failed");
     }
     if (!index || !isIntType(index->type())) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, node.loc, "array index must be of type int");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "array index must be of type int"
+        );
         throw std::runtime_error("semantic analysis failed");
     }
     node.setType(static_cast<const ArrayType *>(baseType.get())->elementType());
@@ -543,7 +689,6 @@ void SemanticPass::visit(ExprCond &node) {
 void SemanticPass::declareFunctionHeader(Header *header) {}
 void SemanticPass::declareGlobalVariable(VarDef *varDef) {}
 void SemanticPass::declareClassDefinition(ClassDef *classDef) {
-    std::cout << "Declaring class: " << classDef->identifier() << "\n";
 }
 void SemanticPass::VerifyEntryPoint(const vec<uptr<ASTNode>> &defs) {
     FuncDef *mainFunc = nullptr;
@@ -557,18 +702,33 @@ void SemanticPass::VerifyEntryPoint(const vec<uptr<ASTNode>> &defs) {
         }
     }
     if (!mainFunc) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, mainFunc->loc, "No 'main' function defined.");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            mainFunc->loc,
+            "No 'main' function defined."
+        );
         throw std::runtime_error("semantic analysis failed");
     }
     mainFunc->setEntrypoint(true);
     auto *header = mainFunc->funcHeader();
     if (!header) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, mainFunc->loc, "'main' function has no header.");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            mainFunc->loc,
+            "'main' function has no header."
+        );
         throw std::runtime_error("semantic analysis failed");
     }
     FuncSymbol *mainSymbol = header->symbol();
     if (!mainSymbol) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, mainFunc->loc, "'main' function has no associated symbol.");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            mainFunc->loc,
+            "'main' function has no associated symbol."
+        );
         throw std::runtime_error("semantic analysis failed");
     }
     // if (!mainSymbol->isProcedure()) {
@@ -618,13 +778,23 @@ bool SemanticPass::validateDimension(const std::optional<int> &dim, bool allowUn
         if (allowUnsized) {
             return true;
         } else {
-            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, loc, "Array dimension must be specified.");
+            semanticCtx.getDiagnostics().report(
+                Diagnostics::Severity::Error,
+                Diagnostics::Phase::SemanticAnalysis,
+                loc,
+                "Array dimension must be specified."
+            );
             // return false;
             throw std::runtime_error("semantic analysis failed");
         }
     }
     if (*dim <= 0) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, loc, "Array dimension must be a positive integer.");
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            loc,
+            "Array dimension must be a positive integer."
+        );
         // return false;
         throw std::runtime_error("semantic analysis failed");
     }
@@ -664,7 +834,11 @@ SemaTypePtr SemanticPass::scalarType(DataType::DataType dt) {
 }
 SemaTypePtr SemanticPass::resolveType(const Type &node, bool allowUnsizedFirst) {
     auto base_type = scalarType(node.data_type());
-    return buildArrayType(node.loc, base_type, node.dimensions(), allowUnsizedFirst);
+    auto array_type = buildArrayType(node.loc, base_type, node.dimensions(), allowUnsizedFirst);
+    if (!array_type && node.data_type() == DataType::DataType::MAY_INSTANCE) {
+        return makeInstanceType(node.getName().value());
+    }
+    return array_type;
 }
 SemaTypePtr SemanticPass::resolveParamType(const FuncParameterType &node, Symbol::ParamPass &pass) {
     const bool isArray = !node.dimensions().empty();
@@ -705,6 +879,10 @@ std::string SemanticPass::typeToString(const SemaTypePtr &type) {
             oss << ']';
             return oss.str();
         }
+        case SemaType::TypeKind::INST: {
+            const InstanceType *instType = static_cast<const InstanceType *>(type.get());
+            return "instance of " + instType->className();
+        }
         case SemaType::TypeKind::FUNC:
             return "fn";
         case SemaType::TypeKind::VOID:
@@ -724,7 +902,12 @@ bool SemanticPass::collectParams(const Header &header, std::vector<ParamInfo> &p
         }
         auto parm_type = param->parameterType();
         if (!parm_type) {
-            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, param->loc, "Parameter in function '" + name + "' has no type.");
+            semanticCtx.getDiagnostics().report(
+                Diagnostics::Severity::Error,
+                Diagnostics::Phase::SemanticAnalysis,
+                param->loc,
+                "Parameter in function '" + name + "' has no type."
+            );
             throw std::runtime_error("semantic analysis failed");
         }
         Symbol::ParamPass pass;
@@ -735,7 +918,12 @@ bool SemanticPass::collectParams(const Header &header, std::vector<ParamInfo> &p
 
         for (const auto &param_name: param->names()) {
             if (seen.insert(param_name).second == false) {
-                semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, param->loc, "Duplicate parameter name '" + param_name + "' in function '" + name + "'.");
+                semanticCtx.getDiagnostics().report(
+                    Diagnostics::Severity::Error,
+                    Diagnostics::Phase::SemanticAnalysis,
+                    param->loc,
+                    "Duplicate parameter name '" + param_name + "' in function '" + name + "'."
+                );
                 throw std::runtime_error("semantic analysis failed");
             }
             ParamInfo pinfo;
@@ -788,7 +976,12 @@ bool SemanticPass::signaturesMatch(bool isProcedure, const SemaTypePtr &returnTy
 }
 bool SemanticPass::checkArguments(const vec<uptr<Expr>> &args, const std::vector<ParamSymbol *> &params, const std::string &callee, const Location &loc) {
     if (args.size() != params.size()) {
-        semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, loc, "call to '" + callee + "' expects " + std::to_string(params.size()) + " argument(s) but got " + std::to_string(args.size()));
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            loc,
+            "call to '" + callee + "' expects " + std::to_string(params.size()) + " argument(s) but got " + std::to_string(args.size())
+        );
         throw std::runtime_error("semantic analysis failed");
     }
     std::size_t count = std::min(args.size(), params.size());
@@ -800,7 +993,12 @@ bool SemanticPass::checkArguments(const vec<uptr<Expr>> &args, const std::vector
         }
         auto actualType = arg ? arg->type() : SemaTypePtr{};
         if (!typesCompatible(actualType, params[i]->getType())) {
-            semanticCtx.getDiagnostics().report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, arg ? arg->loc : loc, "in call to '" + callee + "', argument " + std::to_string(i + 1) + " has type '" + typeToString(actualType) + "', expected '" + typeToString(params[i]->getType()) + "'");
+            semanticCtx.getDiagnostics().report(
+                Diagnostics::Severity::Error,
+                Diagnostics::Phase::SemanticAnalysis,
+                arg ? arg->loc : loc,
+                "in call to '" + callee + "', argument " + std::to_string(i + 1) + " has type '" + typeToString(actualType) + "', expected '" + typeToString(params[i]->getType()) + "'"
+            );
             throw std::runtime_error("semantic analysis failed");
         }
         if (params[i]->getPass() == Symbol::ParamPass::BY_REF) {

@@ -174,6 +174,10 @@ uptr<VarDef> Parser::parseVarDef() {
     }
     consume(COLON, "Expect ':' to delcare variable type.");
     auto type = parseType();
+    if (type->data_type() == DataType::DataType::MAY_INSTANCE) {
+        Token type_tok = consume(IDENTIFIER, "may be an instance of class");
+        type->setTypeName(type_tok.lexeme);
+    }
 
     // optional initialization
     optional<uptr<Expr>> init = std::nullopt;
@@ -205,7 +209,7 @@ DataType::DataType Parser::parseDataType() {
     if (match({BOOL})) return DataType::DataType::BOOL;
     if (match({CHAR})) return DataType::DataType::CHAR;
     if (match({STR})) return DataType::DataType::STRING;
-    if (match({IDENTIFIER})) return DataType::DataType::CLASS;
+    if (check(IDENTIFIER)) return DataType::DataType::MAY_INSTANCE;
     return DataType::DataType::UNKOWN;
 }
 uptr<Block> Parser::parseBlock() {

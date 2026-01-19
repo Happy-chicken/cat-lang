@@ -109,11 +109,14 @@ protected:
     DataType::DataType base;
     vec<std::optional<int>> dims;// dimensions for array types
     void printTypeDetails(std::ostream &out) const;
+    std::optional<string> type_name;
 
 public:
     Type(Location l, DataType::DataType b, vec<std::optional<int>> d = {});
     virtual ~Type() override = default;
     DataType::DataType data_type() const;
+    void setTypeName(const string &name);
+    const optional<string> &getName() const;
     const vec<std::optional<int>> &dimensions() const;
     void accept(AstVisitor &v) override;
     virtual void print(std::ostream &out) const override;
@@ -245,6 +248,7 @@ public:
     bool isEntrypoint();
     bool isMethod();
     void setEntrypoint(bool cond);
+    void setIsMethod(bool cond);
 
 private:
     uptr<Header> header;

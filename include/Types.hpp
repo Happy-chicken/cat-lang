@@ -9,7 +9,7 @@ namespace DataType {
         VOID,
         STRING,
         BYTE,
-        CLASS,
+        MAY_INSTANCE,
         UNKOWN
     };
 
@@ -27,6 +27,8 @@ namespace DataType {
                 return "void";
             case DataType::STRING:
                 return "string";
+            case DataType::MAY_INSTANCE:
+                return "instance?";
             default:
                 return "unknown";
         }

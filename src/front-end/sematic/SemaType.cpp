@@ -1,6 +1,7 @@
 #include "SemaType.hpp"
 
 #include <cstddef>
+#include <ostream>
 #include <utility>
 
 SemaType::SemaType(TypeKind kind)
@@ -8,6 +9,45 @@ SemaType::SemaType(TypeKind kind)
 
 SemaType::TypeKind SemaType::getKind() const {
     return kind_;
+}
+
+void SemaType::dump(std::ostream &out) const {
+    out << "SemaType(kind=";
+    switch (kind_) {
+        case TypeKind::INT:
+            out << "INT";
+            break;
+        case TypeKind::CHAR:
+            out << "CHAR";
+            break;
+        case TypeKind::BOOL:
+            out << "BOOL";
+            break;
+        case TypeKind::BYTE:
+            out << "BYTE";
+            break;
+        case TypeKind::STR:
+            out << "STR";
+            break;
+        case TypeKind::ARRAY:
+            out << "ARRAY";
+            break;
+        case TypeKind::FUNC:
+            out << "FUNC";
+            break;
+        case TypeKind::CLS:
+            out << "CLS";
+            break;
+        case TypeKind::INST: {
+            const InstanceType *inst_type = static_cast<const InstanceType *>(this);
+            out << "INST Of " << inst_type->className();
+            break;
+        }
+        case TypeKind::VOID:
+            out << "VOID";
+            break;
+    }
+    out << ")";
 }
 
 bool IntType::equals(const SemaType &other) const {
@@ -114,6 +154,42 @@ bool FuncType::equals(const SemaType &other) const {
     return true;
 }
 
+ClassType::ClassType(const std::string &className)
+    : SemaType(TypeKind::CLS),
+      className_(className) {}
+
+const std::string &ClassType::className() const {
+    return className_;
+}
+
+bool ClassType::equals(const SemaType &other) const {
+    if (other.getKind() != TypeKind::CLS) {
+        return false;
+    }
+    const auto &rhs = static_cast<const ClassType &>(other);
+    return className_ == rhs.className_;
+}
+
+InstanceType::InstanceType(const std::string &className)
+    : SemaType(TypeKind::INST),
+      className_(className) {}
+
+const std::string &InstanceType::className() const {
+    return className_;
+}
+
+void InstanceType::setClassName(const std::string &name) {
+    className_ = name;
+}
+
+bool InstanceType::equals(const SemaType &other) const {
+    if (other.getKind() != TypeKind::INST) {
+        return false;
+    }
+    const auto &rhs = static_cast<const InstanceType &>(other);
+    return className_ == rhs.className_;
+}
+
 bool VoidType::equals(const SemaType &other) const {
     return other.getKind() == TypeKind::VOID;
 }
@@ -171,4 +247,12 @@ SemaTypePtr makeArrayType(SemaTypePtr elementType, std::optional<std::size_t> si
 
 SemaTypePtr makeFuncType(SemaTypePtr returnType, std::vector<SemaTypePtr> params) {
     return makeType<FuncType>(std::move(returnType), std::move(params));
+}
+
+SemaTypePtr makeClassType(const std::string &className) {
+    return makeType<ClassType>(className);
+}
+
+SemaTypePtr makeInstanceType(const std::string &className) {
+    return makeType<InstanceType>(className);
 }

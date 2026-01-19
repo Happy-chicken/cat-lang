@@ -88,6 +88,14 @@ const vec<std::optional<int>> &Type::dimensions() const {
     return dims;
 }
 
+void Type::setTypeName(const string &name) {
+    type_name = name;
+}
+
+const optional<string> &Type::getName() const {
+    return type_name;
+}
+
 FuncParameterType::FuncParameterType(Location l, bool ref, DataType::DataType type)
     : Type(l, type), by_ref(ref) {
 }
@@ -193,6 +201,10 @@ bool FuncDef::isEntrypoint() {
 
 bool FuncDef::isMethod() {
     return isMethod_;
+}
+
+void FuncDef::setIsMethod(bool cond) {
+    isMethod_ = cond;
 }
 
 void FuncDef::setEntrypoint(bool cond) {
