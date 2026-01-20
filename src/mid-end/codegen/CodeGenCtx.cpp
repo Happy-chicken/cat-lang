@@ -67,13 +67,20 @@ llvm::GlobalVariable *CodeGenCtx::createGlobalVariable(const std::string &name, 
     return variable;
 }
 
-llvm::Value *CodeGenCtx::allocVar(Symbol *sym, llvm::Type *type, Environment::Env env) {
-    // get entry block
-    llvm::BasicBlock &entryBlock = curFunction->getEntryBlock();
+llvm::Value *CodeGenCtx::createLocalVariable(Symbol *sym, llvm::Type *type, Environment::Env env) {
+    // Save current insertion point
+    auto savedInsertBlock = builder->GetInsertBlock();
+    auto savedInsertPoint = builder->GetInsertPoint();
 
-    // set entry to the beginning of the block
+    // Get entry block and insert alloca at the beginning
+    llvm::BasicBlock &entryBlock = curFunction->getEntryBlock();
     builder->SetInsertPoint(&entryBlock, entryBlock.begin());
-    auto varAlloc = builder->CreateAlloca(type, 0, sym->getName().c_str());
+
+    // Create alloca instruction
+    auto varAlloc = builder->CreateAlloca(type, nullptr, sym->getName());
+
+    // Restore insertion point to continue generating code where we left off
+    builder->SetInsertPoint(savedInsertBlock, savedInsertPoint);
 
     env->bind(sym, varAlloc);
     return varAlloc;

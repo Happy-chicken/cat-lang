@@ -77,7 +77,7 @@ public:
     llvm::Type *getLLVMType(const SemaType &ty, bool forParam = false);
     llvm::GlobalVariable *createGlobalVariable(const std::string &name, llvm::Constant *init);
 
-    llvm::Value *allocVar(Symbol *sym, llvm::Type *type, Environment::Env env);
+    llvm::Value *createLocalVariable(Symbol *sym, llvm::Type *type, Environment::Env env);
     llvm::Function *createFunction(const FuncSymbol *funcSym, llvm::FunctionType *fnType, Environment::Env env);
     llvm::Function *createFunctionProto(const FuncSymbol *funcSym, llvm::FunctionType *fnType, Environment::Env env);
 
