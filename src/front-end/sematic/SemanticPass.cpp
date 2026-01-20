@@ -282,12 +282,6 @@ void SemanticPass::visit(FuncDef &node) {
         }
     }
 
-    for (auto &def: node.localDefs()) {
-        if (def) {
-            def->accept(*this);
-        }
-    }
-
     if (auto *body = node.funcBody()) {
         body->accept(*this);
     }

@@ -187,8 +187,8 @@ void FuncDecl::accept(AstVisitor &v) {
     v.visit(*this);
 }
 
-FuncDef::FuncDef(Location l, uptr<Header> h, vec<uptr<Def>> defs, uptr<Block> b)
-    : Def(l), header(std::move(h)), locals(std::move(defs)), body(std::move(b)) {
+FuncDef::FuncDef(Location l, uptr<Header> h, uptr<Block> b)
+    : Stmt(l), header(std::move(h)), body(std::move(b)) {
 }
 
 void FuncDef::accept(AstVisitor &v) {

@@ -172,10 +172,9 @@ void FuncDecl::print(std::ostream &out) const {
 
 void FuncDef::print(std::ostream &out) const {
     tree::line(out, tree::tag("FuncDef", loc));
-    int n = (header ? 1 : 0) + static_cast<int>(locals.size()) + (body ? 1 : 0);
+    int n = (header ? 1 : 0) + (body ? 1 : 0);
     int k = 0;
     if (header) tree::child(out, header, ++k == n);
-    for (std::size_t i = 0; i < locals.size(); ++i) tree::child(out, locals[i], ++k == n);
     if (body) tree::child(out, body, ++k == n);
 }
 
@@ -310,7 +309,7 @@ void MemberAccessExpr::print(std::ostream &out) const {
 
 void MethodCall::print(std::ostream &out) const {
     tree::line(out, tree::tag("MethodCall", loc) + " method=" + method_);
-    if (object_) tree::child(out, object_, false);
+    if (object_) tree::child(out, object_, true);
     tree::children(out, args);
 }
 

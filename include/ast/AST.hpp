@@ -238,13 +238,12 @@ private:
     uptr<Header> header;
 };
 
-class FuncDef : public Def {
+class FuncDef : public Stmt {
 public:
-    FuncDef(Location l, uptr<Header> h, vec<uptr<Def>> defs, uptr<Block> b);
+    FuncDef(Location l, uptr<Header> h, uptr<Block> b);
 
     void accept(AstVisitor &v) override;
     Header *funcHeader() const { return header.get(); }
-    const vec<uptr<Def>> &localDefs() const { return locals; }
     Block *funcBody() const { return body.get(); }
     void print(std::ostream &out) const override;
     bool isEntrypoint();
@@ -254,7 +253,6 @@ public:
 
 private:
     uptr<Header> header;
-    vec<uptr<Def>> locals;
     uptr<Block> body;
     bool isEntrypoint_;
     bool isMethod_;

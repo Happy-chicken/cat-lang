@@ -61,18 +61,13 @@ uptr<FuncDef> Parser::parseFuncDef() {
     Location loc = currentLocation();
     uptr<Header> header = parseHeader();
     consume(LEFT_BRACE, "Expected '{' before function body.");
-    // parse local variable definitions
-    vec<uptr<Def>> local_defs;
-    while (check(DEF)) {
-        local_defs.push_back(parseFuncDef());
-    }
     vec<uptr<Stmt>> statements;
     while (!check(RIGHT_BRACE) && !isAtEnd()) {
         statements.push_back(parseStmt());
     }
     consume(RIGHT_BRACE, "Expect '}'");
     auto body = make_unique<Block>(currentLocation(), std::move(statements));
-    return make_unique<FuncDef>(loc, std::move(header), std::move(local_defs), std::move(body));
+    return make_unique<FuncDef>(loc, std::move(header), std::move(body));
 }
 
 uptr<ClassDef> Parser::parseClassDef() {
@@ -239,6 +234,9 @@ uptr<Stmt> Parser::parseStmt() {
     }
     if (check(WHILE)) {
         return parseLoopStmt();
+    }
+    if (check(DEF)) {
+        return parseFuncDef();
     }
     if (check(VAR)) {
         return parseVarDef();

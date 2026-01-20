@@ -7,16 +7,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Find LLVM package
-find_package(LLVM 14 REQUIRED CONFIG)
+find_package(LLVM 20.1.8 REQUIRED CONFIG)
 
 #Find the libgc
 find_library(GC_LIB gc REQUIRED)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Set the compiler to clang++-14
-set(CMAKE_CXX_COMPILER "/usr/bin/clang++-14")
-set(CMAKE_LINKER /usr/bin/ld.lld-14)
+# Set the compiler to clang++-20
+set(CMAKE_CXX_COMPILER "/usr/bin/clang++-20")
+set(CMAKE_LINKER /usr/bin/ld.lld-20)
 
 # add include directories
 include_directories(/usr/include/gc)
@@ -58,18 +58,18 @@ add_executable(CatLang main.cpp ${SOURCES})
 #target_link_libraries(CatLang ${GC_LIB})
 
 # Link the LLVM libraries
-#llvm_map_components_to_libnames(LLVM_LIBS   
-#    Analysis
-#    Core
-#    ExecutionEngine
-#    InstCombine
-#    Object
-#    OrcJIT
-#    RuntimeDyld
-#    ScalarOpts
-#    Support
-#    native)
-#target_link_libraries(CatLang ${LLVM_LIBS})
+llvm_map_components_to_libnames(LLVM_LIBS   
+    Analysis
+    Core
+    ExecutionEngine
+    InstCombine
+    Object
+    OrcJIT
+    RuntimeDyld
+    ScalarOpts
+    Support
+    native)
+target_link_libraries(CatLang ${LLVM_LIBS})
 
 target_compile_options(CatLang PRIVATE -fstandalone-debug)
 
