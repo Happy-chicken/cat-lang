@@ -143,6 +143,13 @@ void CodeGen::visit(FuncDef &node) {
 
     body->accept(*this);
 
+    llvm::BasicBlock *BB = ctx.getBuilder().GetInsertBlock();
+    if (BB && !BB->getTerminator()) {
+        if (is_main) {
+            ctx.getBuilder().CreateRet(ctx.getBuilder().getInt32(0));
+        }
+    }
+
     ctx.getBuilder().SetInsertPoint(prevBlock);
     CodeGenCtx::curFunction = prevFn;
     currentEnv = prevEnv;

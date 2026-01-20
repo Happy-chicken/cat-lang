@@ -45,8 +45,13 @@ public:
     ~CodeGenCtx() = default;
 
     llvm::LLVMContext &getLLVMContext() { return *ctx; }
+    const llvm::LLVMContext &getLLVMContext() const { return *ctx; }
+    uptr<llvm::LLVMContext> releaseLLVMContext() { return std::move(ctx); }
     llvm::Module &getModule() { return *module; }
+    const llvm::Module &getModule() const { return *module; }
+    uptr<llvm::Module> releaseModule() { return std::move(module); }
     llvm::IRBuilder<> &getBuilder() { return *builder; }
+    const llvm::IRBuilder<> &getBuilder() const { return *builder; }
     llvm::IRBuilder<> &getVarsBuilder() { return *varsBuilder; }
 
 

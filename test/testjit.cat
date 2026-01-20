@@ -17,5 +17,6 @@ def inner() ->int {
 
 
 def main() { 
+    return 0
     
 }

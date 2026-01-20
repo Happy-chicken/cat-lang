@@ -6,7 +6,7 @@
 #include "Environment.hpp"
 #include "Location.hpp"
 #include "Symbol.hpp"
-#include <llvm-20/llvm/IR/DerivedTypes.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Value.h>
@@ -21,6 +21,10 @@ public:
         std::error_code errorCode;
         llvm::raw_fd_ostream outLL("./out.ll", errorCode);
         ctx.getModule().print(outLL, nullptr);
+    }
+
+    CodeGenCtx &getContext() {
+        return ctx;
     }
 
     void visit(Type &node);

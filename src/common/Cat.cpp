@@ -2,6 +2,7 @@
 #include "CodeGen.hpp"
 #include "CodeGenCtx.hpp"
 #include "Diagnostics.hpp"
+#include "Jit.hpp"
 #include "Parser.hpp"
 #include "PassDriver.hpp"
 #include "Scanner.hpp"
@@ -10,7 +11,7 @@
 #include <fstream>
 #include <ios>
 #include <iostream>
-#include <memory>
+#include <utility>
 std::string Cat::logo{R"(
 ├─Welcome to Cat Programming Language!─┤
 ________________________________________
@@ -66,14 +67,17 @@ void Cat::build(const string &program) {
     cat::setGlobalDiagnostics(&diagnostics);
     try {
         // ---------------------------------------------------------------------------
+
         // lexer analysis
         auto scanner = Scanner(program);
         // ---------------------------------------------------------------------------
+
         // syntax analysis
         auto parser = Parser(scanner);
         auto root = parser.parse();
-        root->print(std::cout);
+        // root->print(std::cout);
         // ---------------------------------------------------------------------------
+
         // semantic analysis
         // 知道变量类型，作用域，函数调用，重定义，未定义等行为
         auto passDriver = PassDriver(*root);
@@ -83,6 +87,7 @@ void Cat::build(const string &program) {
         // semanticCtx.dumpSymbolTable(std::cout);
         // semanticCtx.dumpFuncFrames(std::cout);
         // ---------------------------------------------------------------------------
+
         // intermediate representation generation using LLVM
         CodeGenCtx codeGenCtx("Cat_Module");
         CodeGen codeGen(codeGenCtx);
@@ -91,7 +96,18 @@ void Cat::build(const string &program) {
         // optimize the generated IR
 
         // ---------------------------------------------------------------------------
+
         // JIT
+        JIT catJit{codeGen};
+        llvm::InitLLVM X(argc, argv);
+        LLVMInitializeNativeTarget();
+        LLVMInitializeNativeAsmPrinter();
+        LLVMInitializeNativeAsmParser();
+        uptr<llvm::Module> M = catJit.loadModule();
+        auto llvmctx = codeGen.getContext().releaseLLVMContext();
+
+        llvm::ExitOnError ExitOnErr(std::string(argv[0]) + ": ");
+        ExitOnErr(catJit.run(std::move(M), std::move(llvmctx), argc, argv));
 
     } catch (const std::runtime_error &e) {
         diagnostics.printAll();
