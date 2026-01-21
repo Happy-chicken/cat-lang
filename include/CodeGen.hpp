@@ -9,6 +9,7 @@
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
+#include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
 
@@ -25,6 +26,10 @@ public:
 
     CodeGenCtx &getContext() {
         return ctx;
+    }
+
+    Environment::Env getGlobalEnvironment() const {
+        return globalEnv;
     }
 
     void visit(Type &node);

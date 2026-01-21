@@ -196,7 +196,14 @@ void CodeGen::visit(ReturnStmt &node) {
         ctx.getBuilder().CreateRet(retValue);
     }
 }
-void CodeGen::visit(ProcCall &node) {}
+void CodeGen::visit(ProcCall &node) {
+    lastValue = nullptr;
+    auto *calleeSym = node.funcSymbol();
+    if (!calleeSym) {
+        return;
+    }
+    // makeCall(calleeSym, node.arguments());
+}
 void CodeGen::visit(BreakStmt &node) {}
 void CodeGen::visit(ContinueStmt &node) {}
 void CodeGen::visit(IfStmt &node) {}

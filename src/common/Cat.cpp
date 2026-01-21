@@ -8,6 +8,7 @@
 #include "Scanner.hpp"
 #include "SemanticCtx.hpp"
 #include "SymbolTable.hpp"
+#include "catlib.hpp"
 #include <fstream>
 #include <ios>
 #include <iostream>
@@ -83,6 +84,7 @@ void Cat::build(const string &program) {
         auto passDriver = PassDriver(*root);
         auto symbolTable = SymbolTable();
         auto semanticCtx = SemanticCtx(symbolTable, diagnostics);
+        Catime::declareBuiltins(semanticCtx);
         passDriver.runSemanticPass(semanticCtx);
         // semanticCtx.dumpSymbolTable(std::cout);
         // semanticCtx.dumpFuncFrames(std::cout);
@@ -91,6 +93,7 @@ void Cat::build(const string &program) {
         // intermediate representation generation using LLVM
         CodeGenCtx codeGenCtx("Cat_Module");
         CodeGen codeGen(codeGenCtx);
+        Catime::genBuiltins(semanticCtx, codeGen);
         codeGen.compile(root);
         // ---------------------------------------------------------------------------
         // optimize the generated IR
