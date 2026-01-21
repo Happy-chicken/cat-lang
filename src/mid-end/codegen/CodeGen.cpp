@@ -1,7 +1,10 @@
 #include "CodeGen.hpp"
+#include "AST.hpp"
 #include "CodeGenCtx.hpp"
 #include "Environment.hpp"
 #include "Symbol.hpp"
+#include <cstddef>
+#include <llvm-20/llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
@@ -202,7 +205,7 @@ void CodeGen::visit(ProcCall &node) {
     if (!calleeSym) {
         return;
     }
-    // makeCall(calleeSym, node.arguments());
+    makeCall(calleeSym, node.arguments());
 }
 void CodeGen::visit(BreakStmt &node) {}
 void CodeGen::visit(ContinueStmt &node) {}
@@ -442,4 +445,81 @@ llvm::Function *CodeGen::ensureLLVMFunction(FuncSymbol *funcSym, const FuncSigna
     llvmFunc = llvm::Function::Create(llvmFnTy, llvm::GlobalValue::ExternalLinkage, is_main ? "main" : funcSym->getName(), &ctx.getModule());
     currentEnv->bindFunc(funcSym, llvmFunc);
     return llvmFunc;
+}
+
+llvm::Value *CodeGen::makeCall(FuncSymbol *calleeSym, const vec<uptr<Expr>> &args) {
+    if (!calleeSym) return nullptr;
+
+    // declared function and we can find its LLVM function, parameters and return type
+    llvm::Function *callee = currentEnv->lookupFunc(calleeSym);
+    if (!callee) return nullptr;
+
+    auto *functionTy = callee->getFunctionType();
+    vec<llvm::Value *> callArgs;
+    callArgs.reserve(functionTy->getNumParams());
+    // bool needsStaticLink = calleeSym->definingFunc() != nullptr;
+    unsigned paramIdx = 0;
+
+    const auto &params = calleeSym->getParams();
+    const unsigned totalParams = params.size();
+    // generally, they should be equal
+    // in case we have optional parameters
+    const unsigned realCount = std::min<unsigned>(totalParams, args.size());
+
+    // helper to get lvalue node
+    auto getLValueNode = [](Expr *expr) -> Lval * {
+        while (expr) {
+            if (auto *lvalExpr = dynamic_cast<LValueExpr *>(expr)) {
+                return lvalExpr->lvalue();
+            }
+            if (auto *parenExpr = dynamic_cast<ParenExpr *>(expr)) {
+                expr = parenExpr->innerExpr();
+                continue;
+            }
+            break;
+        }
+        return nullptr;
+    };
+
+    // args 是实参，我们会比较实参和形参，进行cast
+    for (std::size_t i = 0; i < realCount; ++i) {
+        auto *expr = args[i].get();
+        auto *paramSym = params[i];
+
+        llvm::Type *parmTy = functionTy->getFunctionParamType(paramIdx++);
+        llvm::Value *argValue = nullptr;
+
+        if (expr) {
+            const bool byRef = paramSym && paramSym->getPass() == Symbol::ParamPass::BY_REF;
+            if (byRef) {
+                if (auto *lvalNode = getLValueNode(expr)) {
+                    lvalNode->accept(*this);
+                    argValue = lastValue;
+                }
+                if (!argValue) {
+                    expr->accept(*this);
+                    argValue = lastValue;
+                }
+            } else {
+                expr->accept(*this);
+                argValue = lastValue;
+            }
+        }
+        if (!argValue) {
+            argValue = llvm::Constant::getNullValue(parmTy);
+        }
+        lastValue = nullptr;
+
+        if (argValue->getType() != parmTy) {
+            if (argValue->getType()->isPointerTy() && parmTy->isPointerTy()) {
+                argValue = ctx.getBuilder().CreateBitCast(argValue, parmTy, "arg.cast");
+
+            } else if (argValue->getType()->isIntegerTy() && parmTy->isIntegerTy()) {
+                argValue = ctx.getBuilder().CreateIntCast(argValue, parmTy, true, "arg.cast");
+            }
+        }
+        callArgs.push_back(argValue);
+    }
+    // TODO: handle optional parameters
+    return ctx.getBuilder().CreateCall(callee, callArgs);
 }

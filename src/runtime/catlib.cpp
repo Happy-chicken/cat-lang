@@ -2,10 +2,15 @@
 
 
 #include <cstddef>
+#include <cstdio>
+#include <llvm-20/llvm/IR/Type.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Module.h>
 
+extern "C" void cat_print(int x) {
+    std::printf("%d\n", x);
+}
 namespace Catime {
 
     // Local helper structs for builtin declaration
@@ -80,5 +85,7 @@ namespace Catime {
                 globalEnv->bindFunc(static_cast<FuncSymbol *>(res.symbol), fn);
             }
         };
+        llvm::FunctionType *printTy = llvm::FunctionType::get(llvm::Type::getVoidTy(llctx), {i32Ty}, false);
+        bind("print", llvm::Function::Create(printTy, llvm::Function::ExternalLinkage, builtinTable[0].runtimeName, &module));
     }
 }// namespace Catime

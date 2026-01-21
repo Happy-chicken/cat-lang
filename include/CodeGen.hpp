@@ -110,5 +110,5 @@ private:
     static llvm::Value *lastValue;
     Environment::Env globalEnv = nullptr;    // global environment
     Environment::Env &currentEnv = globalEnv;// current environment
-    llvm::Value *makeCall(const FuncSymbol *calleeSym, const vec<uptr<Expr>> &args);
+    llvm::Value *makeCall(FuncSymbol *calleeSym, const vec<uptr<Expr>> &args);
 };

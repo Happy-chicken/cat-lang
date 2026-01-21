@@ -63,6 +63,13 @@ public:
             llvm::errs() << "Error clearing MainJitDylib: " << Err << "\n";
         }
     }
+
+    llvm::orc::JITDylib &getMainJITDylib() {
+        return MainJitDylib;
+    }
+    const llvm::DataLayout &getDataLayout() const {
+        return DL;
+    }
     // create a static factory method to hanle error before creating the instance
     // TODO: customize JIT
     static llvm::Expected<uptr<CatJIT>> Create() {

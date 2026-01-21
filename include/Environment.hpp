@@ -61,7 +61,7 @@ private:
             return shared_from_this();
         }
         if (parentEnv) {
-            return parentEnv->resolve(sym);
+            return parentEnv->resolveFunc(sym);
         }
         return nullptr;
     }
