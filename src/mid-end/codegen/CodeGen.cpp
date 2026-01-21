@@ -215,9 +215,9 @@ void CodeGen::visit(IfStmt &node) {
     llvm::BasicBlock *curBB = ctx.getBuilder().GetInsertBlock();
     llvm::Function *parentFunc = curBB->getParent();
 
-    llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(ctx.getLLVMContext(), "if.end", parentFunc);
+    llvm::BasicBlock *endBlock = ctx.createBasicBlock("if.end", parentFunc);
     Block *elseBlockNode = node.elseBlock();
-    llvm::BasicBlock *elseBlock = elseBlockNode ? llvm::BasicBlock::Create(ctx.getLLVMContext(), "if.else", parentFunc) : endBlock;
+    llvm::BasicBlock *elseBlock = elseBlockNode ? ctx.createBasicBlock("if.else", parentFunc) : endBlock;
 
     //collect all branches
     vec<std::pair<Cond *, Block *>> branches;
@@ -233,8 +233,8 @@ void CodeGen::visit(IfStmt &node) {
         Block *bodyNode = branches[i].second;
         bool lastBranch = (i == branches.size() - 1);
 
-        llvm::BasicBlock *thenBlock = llvm::BasicBlock::Create(ctx.getLLVMContext(), "if.then", parentFunc);
-        llvm::BasicBlock *falseBlock = lastBranch ? elseBlock : llvm::BasicBlock::Create(ctx.getLLVMContext(), "if.else", parentFunc);
+        llvm::BasicBlock *thenBlock = ctx.createBasicBlock("if.then", parentFunc);
+        llvm::BasicBlock *falseBlock = lastBranch ? elseBlock : ctx.createBasicBlock("if.else", parentFunc);
 
         // generate condition
         ctx.getBuilder().SetInsertPoint(condBB);
@@ -266,7 +266,39 @@ void CodeGen::visit(IfStmt &node) {
     ctx.getBuilder().SetInsertPoint(endBlock);
     lastValue = nullptr;
 }
-void CodeGen::visit(LoopStmt &node) {}
+void CodeGen::visit(LoopStmt &node) {
+    llvm::BasicBlock *curBlock = ctx.getBuilder().GetInsertBlock();
+    auto *parentFunc = curBlock ? curBlock->getParent() : nullptr;
+    if (!parentFunc) {
+        lastValue = nullptr;
+        return;
+    }
+
+    auto *condNode = node.conditionExpr();
+    auto *bodyNode = node.loopBody();
+
+    auto *condBlock = ctx.createBasicBlock("loop.cond", parentFunc);
+    auto *bodyBlock = ctx.createBasicBlock("loop.body", parentFunc);
+    auto *endBlock = ctx.createBasicBlock("loop.end", parentFunc);
+
+    if (!curBlock->getTerminator()) {
+        ctx.getBuilder().CreateBr(condBlock);
+    }
+
+    // compile while
+    ctx.getBuilder().SetInsertPoint(condBlock);
+    condNode->accept(*this);
+    ctx.getBuilder().CreateCondBr(lastValue, bodyBlock, endBlock);
+    // compile body
+    ctx.getBuilder().SetInsertPoint(bodyBlock);
+    bodyNode->accept(*this);
+    if (!ctx.getBuilder().GetInsertBlock()->getTerminator()) {
+        ctx.getBuilder().CreateBr(condBlock);
+    }
+    // end while
+    ctx.getBuilder().SetInsertPoint(endBlock);
+}
+
 
 void CodeGen::visit(IdLVal &node) {
     auto sym = node.symbol();

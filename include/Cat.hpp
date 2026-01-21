@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Optimizer.hpp"
 #include <string>
 #include <string_view>
 using std::string;
@@ -11,8 +12,8 @@ public:
     // ---------------------------------------
     // build the program
     // ---------------------------------------
-    void build(const std::string &program);
-    void buildFile(std::string path);
+    void build(const std::string &program, llvm::OptimizationLevel optLevel);
+    void buildFile(std::string path, llvm::OptimizationLevel optLevel);
     // ---------------------------------------
     // run the program
     // ---------------------------------------

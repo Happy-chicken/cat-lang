@@ -5,6 +5,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
+#include <llvm-20/llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
@@ -86,7 +87,8 @@ public:
     llvm::Function *createFunction(const FuncSymbol *funcSym, llvm::FunctionType *fnType, Environment::Env env);
     llvm::Function *createFunctionProto(const FuncSymbol *funcSym, llvm::FunctionType *fnType, Environment::Env env);
 
-    void createFunctionBlock(llvm::Function *fn);// create a function block
+    void createFunctionBlock(llvm::Function *fn);                                             // create a function block
+    llvm::BasicBlock *createBasicBlock(const std::string &bbName, llvm::Function *parentFunc);// create a basic block
 
 
     // methods related to class

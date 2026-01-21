@@ -3,15 +3,19 @@
 #include "CodeGenCtx.hpp"
 #include "Diagnostics.hpp"
 #include "Jit.hpp"
+#include "Optimizer.hpp"
 #include "Parser.hpp"
 #include "PassDriver.hpp"
 #include "Scanner.hpp"
 #include "SemanticCtx.hpp"
 #include "SymbolTable.hpp"
 #include "catlib.hpp"
+#include <cstdlib>
 #include <fstream>
 #include <ios>
 #include <iostream>
+#include <llvm-20/llvm/IR/Verifier.h>
+#include <llvm-20/llvm/Passes/OptimizationLevel.h>
 #include <utility>
 std::string Cat::logo{R"(
 ├─Welcome to Cat Programming Language!─┤
@@ -62,7 +66,7 @@ ________________________________________
 //     std::cout << "Result: " << AS_INT(res) << '\n';
 // }
 
-void Cat::build(const string &program) {
+void Cat::build(const string &program, llvm::OptimizationLevel optLevel) {
     // define diagnostics
     auto diagnostics = Diagnostics();
     cat::setGlobalDiagnostics(&diagnostics);
@@ -97,6 +101,12 @@ void Cat::build(const string &program) {
         codeGen.compile(root);
         // ---------------------------------------------------------------------------
         // optimize the generated IR
+        Optimizier optimizer;
+        optimizer.optimize(codeGenCtx.getModule(), optLevel);
+        if (llvm::verifyModule(codeGenCtx.getModule(), &llvm::errs())) {
+            std::cerr << "Error: Generated LLVM IR is invalid.\n";
+            exit(1);
+        }
 
         // ---------------------------------------------------------------------------
 
@@ -135,9 +145,9 @@ std::string Cat::readFile(std::string_view filename) {
 }
 
 
-void Cat::buildFile(string path) {
+void Cat::buildFile(string path, llvm::OptimizationLevel optLevel) {
     std::string source = readFile(path);
-    build(source);
+    build(source, optLevel);
 }
 
 // void Cat::runFile(string path) {

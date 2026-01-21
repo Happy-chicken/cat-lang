@@ -1,6 +1,7 @@
 #include "CodeGenCtx.hpp"
 #include "AST.hpp"
 #include "SemaType.hpp"
+#include <llvm-20/llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalVariable.h>
@@ -108,8 +109,12 @@ llvm::Function *CodeGenCtx ::createFunctionProto(const FuncSymbol *funcSym, llvm
 }
 
 void CodeGenCtx::createFunctionBlock(llvm::Function *fn) {
-    auto entry = llvm::BasicBlock::Create(getLLVMContext(), "entry", fn);
+    auto entry = createBasicBlock("entry", fn);
     builder->SetInsertPoint(entry);
+}
+
+llvm::BasicBlock *CodeGenCtx::createBasicBlock(const std::string &bbName, llvm::Function *parentFunc) {
+    return llvm::BasicBlock::Create(getLLVMContext(), bbName, parentFunc);
 }
 
 
