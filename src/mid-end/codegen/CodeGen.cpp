@@ -4,12 +4,14 @@
 #include "Environment.hpp"
 #include "Symbol.hpp"
 #include <cstddef>
-#include <llvm-20/llvm/IR/Function.h>
+#include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Verifier.h>
 #include <memory>
+#include <utility>
 
 llvm::Value *CodeGen::lastValue = nullptr;
 
@@ -209,7 +211,61 @@ void CodeGen::visit(ProcCall &node) {
 }
 void CodeGen::visit(BreakStmt &node) {}
 void CodeGen::visit(ContinueStmt &node) {}
-void CodeGen::visit(IfStmt &node) {}
+void CodeGen::visit(IfStmt &node) {
+    llvm::BasicBlock *curBB = ctx.getBuilder().GetInsertBlock();
+    llvm::Function *parentFunc = curBB->getParent();
+
+    llvm::BasicBlock *endBlock = llvm::BasicBlock::Create(ctx.getLLVMContext(), "if.end", parentFunc);
+    Block *elseBlockNode = node.elseBlock();
+    llvm::BasicBlock *elseBlock = elseBlockNode ? llvm::BasicBlock::Create(ctx.getLLVMContext(), "if.else", parentFunc) : endBlock;
+
+    //collect all branches
+    vec<std::pair<Cond *, Block *>> branches;
+    // add if-then branch
+    branches.emplace_back(node.conditionExpr(), node.thenBlock());
+    for (const auto &elifPair: node.elifs()) {
+        branches.emplace_back(elifPair.first.get(), elifPair.second.get());
+    }
+
+    llvm::BasicBlock *condBB = curBB;
+    for (std::size_t i = 0; i < branches.size(); ++i) {
+        Cond *condNode = branches[i].first;
+        Block *bodyNode = branches[i].second;
+        bool lastBranch = (i == branches.size() - 1);
+
+        llvm::BasicBlock *thenBlock = llvm::BasicBlock::Create(ctx.getLLVMContext(), "if.then", parentFunc);
+        llvm::BasicBlock *falseBlock = lastBranch ? elseBlock : llvm::BasicBlock::Create(ctx.getLLVMContext(), "if.else", parentFunc);
+
+        // generate condition
+        ctx.getBuilder().SetInsertPoint(condBB);
+        condNode->accept(*this);
+        llvm::Value *condValue = lastValue;
+        ctx.getBuilder().CreateCondBr(condValue, thenBlock, falseBlock);
+        // generate then block
+        ctx.getBuilder().SetInsertPoint(thenBlock);
+        bodyNode->accept(*this);
+        // if then block is not terminated, branch to end
+        llvm::BasicBlock *thenExit = ctx.getBuilder().GetInsertBlock();
+        if (thenExit && !thenExit->getTerminator()) {
+            ctx.getBuilder().CreateBr(endBlock);
+        }
+        condBB = falseBlock;
+
+        // generate else block
+        if (elseBlockNode) {
+            lastValue = nullptr;
+            ctx.getBuilder().SetInsertPoint(elseBlock);
+            elseBlockNode->accept(*this);
+            llvm::BasicBlock *elseExit = ctx.getBuilder().GetInsertBlock();
+            if (elseExit && !elseExit->getTerminator()) {
+                ctx.getBuilder().CreateBr(endBlock);
+            }
+        }
+    }
+    // continue at end block
+    ctx.getBuilder().SetInsertPoint(endBlock);
+    lastValue = nullptr;
+}
 void CodeGen::visit(LoopStmt &node) {}
 
 void CodeGen::visit(IdLVal &node) {
@@ -428,7 +484,9 @@ void CodeGen::visit(BinaryExpr &node) {
             break;
     }
 }
-void CodeGen::visit(ExprCond &node) {}
+void CodeGen::visit(ExprCond &node) {
+    node.expression()->accept(*this);
+}
 
 
 // make sure that function symbol has corresponding LLVM function in module
