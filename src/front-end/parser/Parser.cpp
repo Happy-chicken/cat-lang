@@ -511,21 +511,44 @@ uptr<Expr> Parser::parsePrimary() {
             auto args = parseArguments();
             consume(RIGHT_PAREN, "Expected ')'");
             expr = std::make_unique<FuncCall>(loc, idTok.lexeme, std::move(args));
-        } else {
+        }
+        // else if (check(LEFT_BRACKET)) {
+        //     // index l-value
+        //     while (match({LEFT_BRACKET})) {
+        //         auto base_expr = make_unique<IdLVal>(idTok.location, idTok.lexeme);
+        //         auto index_expr = parseExpr();
+        //         consume(RIGHT_BRACKET, "Expect ']'");
+        //         // expr = make_unique<IndexLVal>(loc, std::move(base_expr), std::move(index_expr));
+        //     }
+        // }
+        else {
             // base l-value
             uptr<Lval> lval = std::make_unique<IdLVal>(loc, idTok.lexeme);
             expr = std::make_unique<LValueExpr>(loc, std::move(lval));
         }
 
-        // suffix chain: .member, .method(...)
-        while (match({DOT})) {
-            Token memTok = consume(IDENTIFIER, "Expected member name after '.'");
-            if (match({LEFT_PAREN})) {
-                auto args = parseArguments();
-                consume(RIGHT_PAREN, "Expected ')'");
-                expr = std::make_unique<MethodCall>(loc, std::move(expr), memTok.lexeme, std::move(args));
+        // suffix chain: .member, .method(...), [index]
+        while (true) {
+            // member access and method call
+            if (match({DOT})) {
+                Token memTok = consume(IDENTIFIER, "Expected member name after '.'");
+                if (match({LEFT_PAREN})) {
+                    auto args = parseArguments();
+                    consume(RIGHT_PAREN, "Expected ')'");
+                    expr = std::make_unique<MethodCall>(loc, std::move(expr), memTok.lexeme, std::move(args));
+                } else {
+                    expr = std::make_unique<MemberAccessExpr>(loc, std::move(expr), memTok.lexeme);
+                }
+            }
+            // array indexing
+            else if (match({LEFT_BRACKET})) {
+                auto index = parseExpr();
+                consume(RIGHT_BRACKET, "Expected ']'");
+                uptr<Lval> lval = std::make_unique<IdLVal>(loc, idTok.lexeme);
+                uptr<Lval> indexLval = std::make_unique<IndexLVal>(loc, std::move(lval), std::move(index));
+                expr = std::make_unique<LValueExpr>(loc, std::move(indexLval));
             } else {
-                expr = std::make_unique<MemberAccessExpr>(loc, std::move(expr), memTok.lexeme);
+                break;
             }
         }
 

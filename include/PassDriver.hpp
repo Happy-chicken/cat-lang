@@ -9,6 +9,7 @@ public:
         : astRoot(ast) {}
 
     void runSemanticPass(SemanticCtx &ctx);
+    void runControlFlowPass(SemanticCtx &ctx);
 
 private:
     Program &astRoot;

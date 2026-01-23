@@ -90,6 +90,7 @@ void Cat::build(const string &program, llvm::OptimizationLevel optLevel) {
         auto semanticCtx = SemanticCtx(symbolTable, diagnostics);
         Catime::declareBuiltins(semanticCtx);
         passDriver.runSemanticPass(semanticCtx);
+        passDriver.runControlFlowPass(semanticCtx);
         // semanticCtx.dumpSymbolTable(std::cout);
         // semanticCtx.dumpFuncFrames(std::cout);
         // ---------------------------------------------------------------------------
