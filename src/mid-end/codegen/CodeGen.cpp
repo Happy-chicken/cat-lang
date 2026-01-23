@@ -516,6 +516,9 @@ void CodeGen::visit(BinaryExpr &node) {
             break;
     }
 }
+
+void CodeGen::visit(ArrayExpr &node) {}
+
 void CodeGen::visit(ExprCond &node) {
     node.expression()->accept(*this);
 }

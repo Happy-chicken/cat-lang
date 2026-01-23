@@ -12,6 +12,7 @@
 #include "Location.hpp"
 #include "Operator.hpp"
 #include "Parser.hpp"
+#include "Symbol.hpp"
 #include "Token.hpp"
 #include "Types.hpp"
 
@@ -499,6 +500,16 @@ uptr<Expr> Parser::parsePrimary() {
         auto expr = parseExpr();
         consume(RIGHT_PAREN, "Expected ')'");
         return std::make_unique<ParenExpr>(loc, std::move(expr));
+    }
+    // array [1,2,3] [[1,2], [1,3]]
+    if (match({LEFT_BRACKET})) {
+        vec<uptr<Expr>> elems;
+        elems.clear();
+        do {
+            elems.push_back(parseExpr());
+        } while (match({COMMA}));
+        consume(RIGHT_BRACKET, "Expected ']' at end of array");
+        return make_unique<ArrayExpr>(loc, std::move(elems));
     }
 
     // Identifier-led expressions: variable, function call, member access, method call

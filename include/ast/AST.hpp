@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -582,6 +583,17 @@ private:
     BinOp op;
     uptr<Expr> lhs;
     uptr<Expr> rhs;
+};
+
+class ArrayExpr : public Expr {
+public:
+    ArrayExpr(Location loc, vec<uptr<Expr>> elems);
+    void accept(AstVisitor &v) override;
+    void print(std::ostream &out) const override;
+    const vec<uptr<Expr>> &getElements() const { return elements; }
+
+private:
+    vec<uptr<Expr>> elements;
 };
 
 // ===== Conditions =====

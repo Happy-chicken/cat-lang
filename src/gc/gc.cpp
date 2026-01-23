@@ -113,28 +113,28 @@ void GC::collect() {
     std::cout << "gc end" << std::endl;
 }
 
-int main() {
+// int main() {
 
-    GC &gc = getGC();
+//     GC &gc = getGC();
 
-    Node *nodeA = new Node("nodeA");
-    Node *nodeB = new Node("nodeB");
-    Node *nodeC = new Node("nodeC");
-    Node *nodeD = new Node("nodeD");
+//     Node *nodeA = new Node("nodeA");
+//     Node *nodeB = new Node("nodeB");
+//     Node *nodeC = new Node("nodeC");
+//     Node *nodeD = new Node("nodeD");
 
-    nodeA->addReference(nodeB);
-    nodeB->addReference(nodeC);
-    nodeC->addReference(nodeA);
-    nodeD->addReference(nodeB);
-    gc.addRoot(nodeA);
-    gc.addRoot(nodeD);
-    gc.collect();
+//     nodeA->addReference(nodeB);
+//     nodeB->addReference(nodeC);
+//     nodeC->addReference(nodeA);
+//     nodeD->addReference(nodeB);
+//     gc.addRoot(nodeA);
+//     gc.addRoot(nodeD);
+//     gc.collect();
 
-    gc.removeRoot(nodeA);
-    gc.collect();
+//     gc.removeRoot(nodeA);
+//     gc.collect();
 
-    gc.removeRoot(nodeD);
-    gc.collect();
+//     gc.removeRoot(nodeD);
+//     gc.collect();
 
-    return 0;
-}
+//     return 0;
+// }

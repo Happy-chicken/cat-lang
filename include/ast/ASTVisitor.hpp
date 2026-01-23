@@ -81,6 +81,7 @@ public:
     virtual void visit(MethodCall &) = 0;
     virtual void visit(UnaryExpr &) = 0;
     virtual void visit(BinaryExpr &) = 0;
+    virtual void visit(ArrayExpr &v) = 0;
     virtual void visit(ExprCond &) = 0;
     // virtual void visit(ParenCond &) = 0;
     // virtual void visit(NotCond &) = 0;

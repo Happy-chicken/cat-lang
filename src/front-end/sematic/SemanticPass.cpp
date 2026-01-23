@@ -887,6 +887,8 @@ void SemanticPass::visit(MethodCall &node) {
     node.setAssignable(false);
 }
 
+void SemanticPass::visit(ArrayExpr &node) {}
+
 void SemanticPass::visit(IntConst &node) {
     node.setType(makeIntType());
     node.setConstExpr(true);

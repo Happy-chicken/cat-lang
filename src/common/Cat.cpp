@@ -80,7 +80,7 @@ void Cat::build(const string &program, llvm::OptimizationLevel optLevel) {
         // syntax analysis
         auto parser = Parser(scanner);
         auto root = parser.parse();
-        // root->print(std::cout);
+        root->print(std::cout);
         // ---------------------------------------------------------------------------
 
         // semantic analysis

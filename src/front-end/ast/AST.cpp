@@ -1,5 +1,6 @@
 #include "AST.hpp"
 #include "ASTVisitor.hpp"
+#include "Location.hpp"
 #include "Types.hpp"
 // ===== Base nodes =====
 
@@ -380,6 +381,11 @@ void BinaryExpr::accept(AstVisitor &v) {
     v.visit(*this);
 }
 
+
+ArrayExpr::ArrayExpr(Location loc, vec<uptr<Expr>> elems) : Expr(loc), elements(std::move(elems)) {}
+void ArrayExpr::accept(AstVisitor &v) {
+    v.visit(*this);
+}
 // ===== Conditions =====
 
 Cond::Cond(Location l)

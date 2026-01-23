@@ -59,6 +59,7 @@ public:
     void visit(MethodCall &node) override;
     void visit(UnaryExpr &node) override;
     void visit(BinaryExpr &node) override;
+    void visit(ArrayExpr &node) override;
     void visit(ExprCond &node) override;
 
 

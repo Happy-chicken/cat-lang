@@ -1,7 +1,9 @@
 #include "AST.hpp"
 #include "Location.hpp"
+#include <cstddef>
 #include <cstdio>
 #include <iostream>
+#include <ostream>
 #include <sstream>
 #include <vector>
 
@@ -328,6 +330,14 @@ void BinaryExpr::print(std::ostream &out) const {
     int n = (lhs ? 1 : 0) + (rhs ? 1 : 0), k = 0;
     if (lhs) tree::child(out, lhs, ++k == n);
     if (rhs) tree::child(out, rhs, ++k == n);
+}
+
+void ArrayExpr::print(std::ostream &out) const {
+    tree::line(out, tree::tag("ArrayExpr", loc) + " #elem=" + std::to_string(elements.size()));
+    size_t n = elements.size(), k = 0;
+    for (const auto &elem: elements) {
+        tree::child(out, elem, ++k == n);
+    }
 }
 
 void ExprCond::print(std::ostream &out) const {

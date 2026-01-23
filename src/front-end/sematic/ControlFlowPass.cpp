@@ -140,4 +140,6 @@ void ControlFlowPass::visit(MemberAccessExpr &node) {}
 void ControlFlowPass::visit(MethodCall &node) {}
 void ControlFlowPass::visit(UnaryExpr &node) {}
 void ControlFlowPass::visit(BinaryExpr &node) {}
+void ControlFlowPass::visit(ArrayExpr &node) {};
+
 void ControlFlowPass::visit(ExprCond &node) {}
