@@ -5,6 +5,8 @@
 #include "Symbol.hpp"
 #include <cstddef>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/IR/Constants.h>
+#include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Instructions.h>
 #include <llvm/IR/Type.h>
@@ -83,6 +85,7 @@ void CodeGen::visit(VarDef &node) {
             auto varAddr = ctx.createLocalVariable(sym, llvmType, currentEnv);
             lastValue = varAddr;
         }
+        lastValue = nullptr;
         return;
     }
     // there is initializer
@@ -188,7 +191,7 @@ void CodeGen::visit(AssignStmt &node) {
         lhsAddr = lastValue;
     }
     if (lhsAddr && rhsValue) {
-        ctx.getBuilder().CreateStore(rhsValue, lhsAddr);// store lhs, rhs
+        ctx.getBuilder().CreateStore(rhsValue, lhsAddr);// store lhs -> rhs
     }
     lastValue = nullptr;
 }
@@ -517,7 +520,62 @@ void CodeGen::visit(BinaryExpr &node) {
     }
 }
 
-void CodeGen::visit(ArrayExpr &node) {}
+void CodeGen::visit(ArrayExpr &node) {
+    const auto &elems = node.getElements();
+    if (elems.empty()) {
+        return;
+    }
+
+    const auto semaTy = node.type();
+    const auto *arraySema = semaTy ? dynamic_cast<const ArrayType *>(semaTy.get()) : nullptr;
+    if (!arraySema || !arraySema->size().has_value()) {
+        return;// only arrat literal with length supported
+    }
+
+    llvm::Type *elemTy = ctx.getLLVMType(*arraySema->elementType());
+    if (!elemTy) {
+        return;
+    }
+
+    auto *arrayTy = llvm::ArrayType::get(elemTy, *arraySema->size());
+    auto *arrayPtr = ctx.getBuilder().CreateAlloca(arrayTy, nullptr, "arr.lit");
+    auto *zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx.getLLVMContext()), 0);
+
+    for (std::size_t i = 0; i < elems.size(); ++i) {
+        elems[i]->accept(*this);
+        llvm::Value *elemVal = lastValue;
+        if (!elemVal) {
+            continue;
+        }
+        // 简单的整数/指针类型对齐
+        if (elemVal->getType() != elemTy) {
+            if (elemVal->getType()->isIntegerTy() && elemTy->isIntegerTy()) {
+                elemVal = ctx.getBuilder().CreateIntCast(
+                    elemVal,
+                    elemTy,
+                    true,
+                    "arr.elem.cast"
+                );
+            } else if (elemVal->getType()->isPointerTy() && elemTy->isPointerTy()) {
+                elemVal = ctx.getBuilder().CreateBitCast(
+                    elemVal,
+                    elemTy,
+                    "arr.elem.cast"
+                );
+            }
+        }
+        auto *idxConst = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx.getLLVMContext()), i);
+        auto *slot = ctx.getBuilder().CreateInBoundsGEP(
+            arrayTy,
+            arrayPtr,
+            {zero, idxConst},
+            "arr.slot"
+        );
+        ctx.getBuilder().CreateStore(elemVal, slot);
+    }
+
+    lastValue = ctx.getBuilder().CreateLoad(arrayTy, arrayPtr, "arr.val");
+}
 
 void CodeGen::visit(ExprCond &node) {
     node.expression()->accept(*this);

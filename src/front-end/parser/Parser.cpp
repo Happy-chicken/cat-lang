@@ -555,9 +555,11 @@ uptr<Expr> Parser::parsePrimary() {
             else if (match({LEFT_BRACKET})) {
                 auto index = parseExpr();
                 consume(RIGHT_BRACKET, "Expected ']'");
-                uptr<Lval> lval = std::make_unique<IdLVal>(loc, idTok.lexeme);
-                uptr<Lval> indexLval = std::make_unique<IndexLVal>(loc, std::move(lval), std::move(index));
-                expr = std::make_unique<LValueExpr>(loc, std::move(indexLval));
+                if (auto lvalExpr = dynamic_cast<LValueExpr *>(expr.get())) {
+                    uptr<Lval> lval = lvalExpr->releaseLVal();
+                    uptr<Lval> indexLval = std::make_unique<IndexLVal>(loc, std::move(lval), std::move(index));
+                    expr = std::make_unique<LValueExpr>(loc, std::move(indexLval));
+                }
             } else {
                 break;
             }

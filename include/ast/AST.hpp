@@ -488,6 +488,7 @@ public:
     void accept(AstVisitor &v) override;
     void print(std::ostream &out) const override;
     Lval *lvalue() const { return value.get(); }
+    uptr<Lval> releaseLVal() { return std::move(value); }
 
 private:
     uptr<Lval> value;

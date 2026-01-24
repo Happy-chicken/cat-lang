@@ -1,6 +1,7 @@
 #include "CodeGenCtx.hpp"
 #include "AST.hpp"
 #include "SemaType.hpp"
+#include <cstddef>
 #include <llvm-20/llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
