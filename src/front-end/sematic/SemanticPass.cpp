@@ -411,15 +411,15 @@ void SemanticPass::visit(AssignStmt &node) {
         );
         throw std::runtime_error("semantic analysis failed");
     }
-    if (isArrayType(leftType)) {
-        semanticCtx.getDiagnostics().report(
-            Diagnostics::Severity::Error,
-            Diagnostics::Phase::SemanticAnalysis,
-            node.loc,
-            "cannot assign to an array value"
-        );
-        throw std::runtime_error("semantic analysis failed");
-    }
+    // if (isArrayType(leftType)) {
+    //     semanticCtx.getDiagnostics().report(
+    //         Diagnostics::Severity::Error,
+    //         Diagnostics::Phase::SemanticAnalysis,
+    //         node.loc,
+    //         "cannot assign to an array value"
+    //     );
+    //     throw std::runtime_error("semantic analysis failed");
+    // }
     if (lhs && !lhs->isAssignable()) {
         semanticCtx.getDiagnostics().report(
             Diagnostics::Severity::Error,
@@ -887,7 +887,30 @@ void SemanticPass::visit(MethodCall &node) {
     node.setAssignable(false);
 }
 
-void SemanticPass::visit(ArrayExpr &node) {}
+void SemanticPass::visit(ArrayExpr &node) {
+    const auto &elems = node.getElements();
+    SemaTypePtr elemType = nullptr;
+
+    if (elems.empty()) {
+        return;
+    }
+
+    for (const auto &e: elems) {
+        e->accept(*this);
+    }
+    elemType = elems[0]->type();
+    for (size_t i = 1; i < elems.size(); ++i) {
+        if (!typesEqual(elemType, elems[i]->type())) {
+            semanticCtx.getDiagnostics().report(
+                Diagnostics::Severity::Error,
+                Diagnostics::Phase::SemanticAnalysis,
+                node.loc,
+                "Array elements must have the same type"
+            );
+        }
+    }
+    node.setType(makeArrayType(elemType, elems.size()));
+}
 
 void SemanticPass::visit(IntConst &node) {
     node.setType(makeIntType());

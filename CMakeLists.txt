@@ -71,7 +71,7 @@ llvm_map_components_to_libnames(LLVM_LIBS
     native)
 target_link_libraries(CatLang ${LLVM_LIBS})
 
-target_compile_options(CatLang PRIVATE -fstandalone-debug)
+target_compile_options(CatLang PRIVATE -g -o0 -fstandalone-debug)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION} at ${LLVM_DIR}")
 message(STATUS "Found SOURCES:  ${SOURCES}")

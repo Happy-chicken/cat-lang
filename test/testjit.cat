@@ -22,11 +22,11 @@ def main() {
     var c:int[4][2] 
     c = [[1,2],[3,4], [5,6],[7,8]]
     while (a > 0){
-        c[a-1] = a
+        //c[a-1] = a
         a = a - 1
     }
-    b = c[0]
-    print(c[1])
+     b = c[1][1]
+     print(b)
     return 0
     
 }
