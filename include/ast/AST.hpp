@@ -274,6 +274,16 @@ private:
     vec<uptr<FuncDef>> methods;
 };
 // ===== Blocks and statements =====
+class ExpressionStmt : public Stmt {
+public:
+    explicit ExpressionStmt(Location loc, uptr<Expr> expr);
+    void accept(AstVisitor &v) override;
+    void print(std::ostream &out) const override;
+    Expr *getExpr() const { return expression.get(); }
+
+private:
+    uptr<Expr> expression;
+};
 
 class SkipStmt : public Stmt {
 public:

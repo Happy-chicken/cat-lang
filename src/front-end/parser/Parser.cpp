@@ -45,7 +45,7 @@ uptr<ASTNode> Parser::parseDeclarations() {
     else if (check(VAR)) {
         return parseVarDef();
     } else {
-        throw error(peek(), "Expect 'def', 'class' or 'var' to declare function, class or variable.");
+        throw error(peek(), "Expected 'def', 'class' or 'var' to declare function, class or variable.");
     }
 }
 
@@ -66,17 +66,17 @@ uptr<FuncDef> Parser::parseFuncDef() {
     while (!check(RIGHT_BRACE) && !isAtEnd()) {
         statements.push_back(parseStmt());
     }
-    consume(RIGHT_BRACE, "Expect '}'");
+    consume(RIGHT_BRACE, "Expected '}'");
     auto body = make_unique<Block>(currentLocation(), std::move(statements));
     return make_unique<FuncDef>(loc, std::move(header), std::move(body));
 }
 
 uptr<ClassDef> Parser::parseClassDef() {
     auto loc = currentLocation();
-    consume(CLASS, "Expect 'class'");
-    string class_name = consume(IDENTIFIER, "Expect class name.").lexeme;
+    consume(CLASS, "Expected 'class'");
+    string class_name = consume(IDENTIFIER, "Expected class name.").lexeme;
 
-    consume(LEFT_BRACE, "Expect '{' before class body.");
+    consume(LEFT_BRACE, "Expected '{' before class body.");
 
     vec<uptr<VarDef>> fields;
     vec<uptr<FuncDef>> methods;
@@ -87,11 +87,11 @@ uptr<ClassDef> Parser::parseClassDef() {
         } else if (check(DEF)) {
             methods.push_back(parseFuncDef());
         } else {
-            throw error(peek(), "Expect 'var' or 'def' in class body.");
+            throw error(peek(), "Expected 'var' or 'def' in class body.");
         }
     }
 
-    consume(RIGHT_BRACE, "Expect '}' after class body.");
+    consume(RIGHT_BRACE, "Expected '}' after class body.");
     return make_unique<ClassDef>(loc, class_name, std::move(fields), std::move(methods));
 }
 
@@ -151,7 +151,7 @@ uptr<FuncParameterType> Parser::parseFuncParameterType(bool is_ref) {
         } else {
             dims.push_back(std::nullopt);
         }
-        consume(RIGHT_BRACKET, "Expect ']'");
+        consume(RIGHT_BRACKET, "Expected ']'");
     }
     if (dims.empty()) {
         return make_unique<FuncParameterType>(loc, is_ref, base_type);
@@ -160,15 +160,15 @@ uptr<FuncParameterType> Parser::parseFuncParameterType(bool is_ref) {
 }
 uptr<VarDef> Parser::parseVarDef() {
     auto loc = currentLocation();
-    consume(VAR, "Expect var to delcare variable.");
+    consume(VAR, "Expected var to delcare variable.");
     vec<string> names;
-    Token token = consume(IDENTIFIER, "Expect variable name.");
+    Token token = consume(IDENTIFIER, "Expected variable name.");
     names.push_back(token.lexeme);
     while (match({COMMA})) {
-        Token else_token = consume(IDENTIFIER, "Expect variable name.");
+        Token else_token = consume(IDENTIFIER, "Expected variable name.");
         names.push_back(else_token.lexeme);
     }
-    consume(COLON, "Expect ':' to delcare variable type.");
+    consume(COLON, "Expected ':' to delcare variable type.");
     auto type = parseType();
     if (type->data_type() == DataType::DataType::MAY_INSTANCE) {
         Token type_tok = consume(IDENTIFIER, "may be an instance of class");
@@ -195,7 +195,7 @@ uptr<Type> Parser::parseType() {
         } else {
             dims.push_back(std::nullopt);
         }
-        consume(RIGHT_BRACKET, "Expect ']'");
+        consume(RIGHT_BRACKET, "Expected ']'");
     }
 
     return make_unique<Type>(loc, base_type, std::move(dims));
@@ -210,12 +210,12 @@ DataType::DataType Parser::parseDataType() {
 }
 uptr<Block> Parser::parseBlock() {
     auto loc = currentLocation();
-    consume(LEFT_BRACE, "Expect '{'.");
+    consume(LEFT_BRACE, "Expected '{'.");
     vec<uptr<Stmt>> statements;
     while (!check(RIGHT_BRACE) && !isAtEnd()) {
         statements.push_back(parseStmt());
     }
-    consume(RIGHT_BRACE, "Expect '}'.");
+    consume(RIGHT_BRACE, "Expected '}'.");
     return make_unique<Block>(loc, std::move(statements));
 }
 uptr<Stmt> Parser::parseStmt() {
@@ -261,14 +261,16 @@ uptr<Stmt> Parser::parseStmt() {
     // if (match({LEFT_BRACE})) {
     //     return parseBlock();
     // }
-    if (check(IDENTIFIER)) {
-        return parseAssignmentOrProcCall();
-    }
-    throw error(peek(), "Unexpected statement, ';' possible at end.");
+    return parseAssignmentOrProcCall();
+}
+uptr<Stmt> Parser::parseExprStmt() {
+
+    uptr<Stmt> assignStmt = parseAssignmentOrProcCall();
+    return assignStmt;
 }
 uptr<Stmt> Parser::parseAssignmentOrProcCall() {
     auto loc = currentLocation();
-    Token token = consume(IDENTIFIER, "Expect identifier.");
+    Token token = consume(IDENTIFIER, "Expected identifier.");
     // assigment
     uptr<Lval> left = make_unique<IdLVal>(token.location, token.lexeme);
     // class member access
@@ -279,33 +281,33 @@ uptr<Stmt> Parser::parseAssignmentOrProcCall() {
         if (!check(RIGHT_PAREN)) {
             arguments = parseArguments();
         }
-        consume(RIGHT_PAREN, "Expect ')' after arguments.");
+        consume(RIGHT_PAREN, "Expected ')' after arguments.");
         return make_unique<ProcCall>(loc, token.lexeme, std::move(arguments));
     }
     // handling array index
     while (match({LEFT_BRACKET})) {
         auto index_expr = parseExpr();
-        consume(RIGHT_BRACKET, "Expect ']'");
+        consume(RIGHT_BRACKET, "Expected ']'");
         left = make_unique<IndexLVal>(loc, std::move(left), std::move(index_expr));
     }
 
-    consume(EQUAL, "Expect '=' in assignment statement.");
+    consume(EQUAL, "Expected '=' in assignment statement.");
     uptr<Expr> right = parseExpr();
     return make_unique<AssignStmt>(loc, std::move(left), std::move(right));
 }
 uptr<IfStmt> Parser::parseIfStmt() {
     Location loc = currentLocation();
     consume(IF, "Expected 'if'");
-    consume(LEFT_PAREN, "Expect '('");
+    consume(LEFT_PAREN, "Expected '('");
     auto cond = parseCond();
-    consume(RIGHT_PAREN, "Expect ')'");
+    consume(RIGHT_PAREN, "Expected ')'");
     auto then_block = parseBlock();
 
     vec<std::pair<uptr<Cond>, uptr<Block>>> elifs;
     while (match({ELIF})) {
-        consume(LEFT_PAREN, "Expect '(' after elif.");
+        consume(LEFT_PAREN, "Expected '(' after elif.");
         auto elif_cond = parseCond();
-        consume(RIGHT_PAREN, "Expect ')' after condition.");
+        consume(RIGHT_PAREN, "Expected ')' after condition.");
         auto elif_block = parseBlock();
         elifs.push_back({std::move(elif_cond), std::move(elif_block)});
     }
@@ -320,9 +322,9 @@ uptr<IfStmt> Parser::parseIfStmt() {
 uptr<LoopStmt> Parser::parseLoopStmt() {
     Location loc = currentLocation();
     consume(WHILE, "Expected 'while'");
-    consume(LEFT_PAREN, "Expect '('");
+    consume(LEFT_PAREN, "Expected '('");
     auto cond = parseCond();
-    consume(RIGHT_PAREN, "Expect ')'");
+    consume(RIGHT_PAREN, "Expected ')'");
     auto body = parseBlock();
     return std::make_unique<LoopStmt>(loc, std::move(cond), std::move(body));
 }
@@ -469,7 +471,36 @@ uptr<Expr> Parser::parseUnary() {
         return std::make_unique<UnaryExpr>(loc, UnOp::Not, parseUnary());
     }
 
-    return parsePrimary();
+    return parseCall();
+}
+uptr<Expr> Parser::parseCall() {
+    uptr<Expr> expr = parsePrimary();
+
+    auto loc = currentLocation();
+    // function call and method call
+    if (match({LEFT_PAREN})) {
+        auto lvalExpr = dynamic_cast<LValueExpr *>(expr.get());
+        if (lvalExpr) {
+            auto idLVal = dynamic_cast<IdLVal *>(lvalExpr->lvalue());
+            if (!idLVal) {
+                error(peek(), "Expected a callee.");
+            }
+            auto args = parseArguments();
+            consume(RIGHT_PAREN, "Expected ')'");
+            expr = std::make_unique<FuncCall>(loc, idLVal->identifier(), std::move(args));
+        }
+
+    } else if (match({DOT})) {
+        Token memTok = consume(IDENTIFIER, "Expected member name after '.'");
+        if (match({LEFT_PAREN})) {
+            auto args = parseArguments();
+            consume(RIGHT_PAREN, "Expecteded ')'");
+            expr = std::make_unique<MethodCall>(loc, std::move(expr), memTok.lexeme, std::move(args));
+        } else {
+            expr = std::make_unique<MemberAccessExpr>(loc, std::move(expr), memTok.lexeme);
+        }
+    }
+    return expr;
 }
 uptr<Expr> Parser::parsePrimary() {
     Location loc = currentLocation();
@@ -517,42 +548,14 @@ uptr<Expr> Parser::parsePrimary() {
         Token idTok = advance();
         uptr<Expr> expr;
 
-        // function call f(...)
-        if (match({LEFT_PAREN})) {
-            auto args = parseArguments();
-            consume(RIGHT_PAREN, "Expected ')'");
-            expr = std::make_unique<FuncCall>(loc, idTok.lexeme, std::move(args));
-        }
-        // else if (check(LEFT_BRACKET)) {
-        //     // index l-value
-        //     while (match({LEFT_BRACKET})) {
-        //         auto base_expr = make_unique<IdLVal>(idTok.location, idTok.lexeme);
-        //         auto index_expr = parseExpr();
-        //         consume(RIGHT_BRACKET, "Expect ']'");
-        //         // expr = make_unique<IndexLVal>(loc, std::move(base_expr), std::move(index_expr));
-        //     }
-        // }
-        else {
-            // base l-value
-            uptr<Lval> lval = std::make_unique<IdLVal>(loc, idTok.lexeme);
-            expr = std::make_unique<LValueExpr>(loc, std::move(lval));
-        }
+        // base l-value
+        uptr<Lval> lval = std::make_unique<IdLVal>(loc, idTok.lexeme);
+        expr = std::make_unique<LValueExpr>(loc, std::move(lval));
 
-        // suffix chain: .member, .method(...), [index]
+        // suffix chain:  [index]
         while (true) {
-            // member access and method call
-            if (match({DOT})) {
-                Token memTok = consume(IDENTIFIER, "Expected member name after '.'");
-                if (match({LEFT_PAREN})) {
-                    auto args = parseArguments();
-                    consume(RIGHT_PAREN, "Expected ')'");
-                    expr = std::make_unique<MethodCall>(loc, std::move(expr), memTok.lexeme, std::move(args));
-                } else {
-                    expr = std::make_unique<MemberAccessExpr>(loc, std::move(expr), memTok.lexeme);
-                }
-            }
             // array indexing
-            else if (match({LEFT_BRACKET})) {
+            if (match({LEFT_BRACKET})) {
                 auto index = parseExpr();
                 consume(RIGHT_BRACKET, "Expected ']'");
                 if (auto lvalExpr = dynamic_cast<LValueExpr *>(expr.get())) {

@@ -1,6 +1,8 @@
 #include "CodeGenCtx.hpp"
 #include "AST.hpp"
+#include "CodeGen.hpp"
 #include "SemaType.hpp"
+#include "Symbol.hpp"
 #include <cstddef>
 #include <llvm-20/llvm/IR/BasicBlock.h>
 #include <llvm/IR/DerivedTypes.h>
@@ -14,54 +16,58 @@ llvm::Function *CodeGenCtx::curFunction = nullptr;
 llvm::Type *CodeGenCtx::getLLVMType(const SemaType &ty, bool forParam) {
     auto typeKind = ty.getKind();
     switch (typeKind) {
-        case SemaType::TypeKind::INT:
-            return llvm::Type::getInt32Ty(getLLVMContext());
-        case SemaType::TypeKind::CHAR:
-            return llvm::Type::getInt8Ty(getLLVMContext());
-        case SemaType::TypeKind::BYTE:
-            return llvm::Type::getInt8Ty(getLLVMContext());
-        case SemaType::TypeKind::BOOL:
-            return llvm::Type::getInt1Ty(getLLVMContext());
-        case SemaType::TypeKind::STR:
-            return llvm::PointerType::get(llvm::Type::getInt8Ty(getLLVMContext()), 0);
-        // return nullptr;
-        case SemaType::TypeKind::VOID:
-            return llvm::Type::getVoidTy(getLLVMContext());
-        case SemaType::TypeKind::ARRAY: {
-            const ArrayType &arrayTy = static_cast<const ArrayType &>(ty);
-            auto elemType = arrayTy.elementType();
-            if (!elemType) {
-                return nullptr;
-            }
-            llvm::Type *elemTy = getLLVMType(*elemType, false);
-            if (!arrayTy.size().has_value()) {
-                return llvm::PointerType::get(elemTy, 0);
-            }
-            auto llvmArrayType = llvm::ArrayType::get(elemTy, *arrayTy.size());
-            return llvmArrayType;
+    case SemaType::TypeKind::INT:
+        return llvm::Type::getInt32Ty(getLLVMContext());
+    case SemaType::TypeKind::CHAR:
+        return llvm::Type::getInt8Ty(getLLVMContext());
+    case SemaType::TypeKind::BYTE:
+        return llvm::Type::getInt8Ty(getLLVMContext());
+    case SemaType::TypeKind::BOOL:
+        return llvm::Type::getInt1Ty(getLLVMContext());
+    case SemaType::TypeKind::STR:
+        return llvm::PointerType::get(llvm::Type::getInt8Ty(getLLVMContext()),
+                                      0);
+    // return nullptr;
+    case SemaType::TypeKind::VOID:
+        return llvm::Type::getVoidTy(getLLVMContext());
+    case SemaType::TypeKind::ARRAY: {
+        const ArrayType &arrayTy = static_cast<const ArrayType &>(ty);
+        auto elemType = arrayTy.elementType();
+        if (!elemType) {
+            return nullptr;
         }
-        case SemaType::TypeKind::FUNC: {
-            const auto &funcTy = static_cast<const FuncType &>(ty);
-            std::vector<llvm::Type *> paramTypes;
-            for (const auto &paramType: funcTy.params()) {
-                if (paramType) {
-                    llvm::Type *llvmParamType = getLLVMType(*paramType, true);
-                    paramTypes.push_back(llvmParamType);
-                }
-            }
-            auto *returnType = funcTy.returnType() ? getLLVMType(*funcTy.returnType(), false)
-                                                   : llvm::Type::getVoidTy(getLLVMContext());
-            auto llvmFuncType = llvm::FunctionType::get(returnType, paramTypes, false);
-            return llvmFuncType;
+        llvm::Type *elemTy = getLLVMType(*elemType, false);
+        if (!arrayTy.size().has_value()) {
+            return llvm::PointerType::get(elemTy, 0);
         }
-        case SemaType::TypeKind::CLS:
-            break;
-        case SemaType::TypeKind::INST:
-            break;
+        auto llvmArrayType = llvm::ArrayType::get(elemTy, *arrayTy.size());
+        return llvmArrayType;
+    }
+    case SemaType::TypeKind::FUNC: {
+        const auto &funcTy = static_cast<const FuncType &>(ty);
+        std::vector<llvm::Type *> paramTypes;
+        for (const auto &paramType : funcTy.params()) {
+            if (paramType) {
+                llvm::Type *llvmParamType = getLLVMType(*paramType, true);
+                paramTypes.push_back(llvmParamType);
+            }
+        }
+        auto *returnType = funcTy.returnType()
+                               ? getLLVMType(*funcTy.returnType(), false)
+                               : llvm::Type::getVoidTy(getLLVMContext());
+        auto llvmFuncType =
+            llvm::FunctionType::get(returnType, paramTypes, false);
+        return llvmFuncType;
+    }
+    case SemaType::TypeKind::CLS:
+        break;
+    case SemaType::TypeKind::INST:
+        break;
     }
     return nullptr;
 }
-llvm::GlobalVariable *CodeGenCtx::createGlobalVariable(const std::string &name, llvm::Constant *init) {
+llvm::GlobalVariable *CodeGenCtx::createGlobalVariable(const std::string &name,
+                                                       llvm::Constant *init) {
     module->getOrInsertGlobal(name, init->getType());
     auto variable = module->getNamedGlobal(name);
     variable->setConstant(false);
@@ -69,7 +75,8 @@ llvm::GlobalVariable *CodeGenCtx::createGlobalVariable(const std::string &name, 
     return variable;
 }
 
-llvm::Value *CodeGenCtx::createLocalVariable(Symbol *sym, llvm::Type *type, Environment::Env env) {
+llvm::Value *CodeGenCtx::createLocalVariable(Symbol *sym, llvm::Type *type,
+                                             Environment::Env env) {
     // Save current insertion point
     auto savedInsertBlock = builder->GetInsertBlock();
     auto savedInsertPoint = builder->GetInsertPoint();
@@ -88,7 +95,9 @@ llvm::Value *CodeGenCtx::createLocalVariable(Symbol *sym, llvm::Type *type, Envi
     return varAlloc;
 }
 
-llvm::Function *CodeGenCtx::createFunction(const FuncSymbol *funcSym, llvm::FunctionType *fnType, Environment::Env env) {
+llvm::Function *CodeGenCtx::createFunction(const FuncSymbol *funcSym,
+                                           llvm::FunctionType *fnType,
+                                           Environment::Env env) {
     auto func = module->getFunction(funcSym->getName());
     if (!func) {
         func = createFunctionProto(funcSym, fnType, env);
@@ -97,13 +106,12 @@ llvm::Function *CodeGenCtx::createFunction(const FuncSymbol *funcSym, llvm::Func
     return func;
 }
 
-llvm::Function *CodeGenCtx ::createFunctionProto(const FuncSymbol *funcSym, llvm::FunctionType *fnType, Environment::Env env) {
-    auto func = llvm::Function::Create(
-        fnType,
-        llvm::GlobalValue::ExternalLinkage,
-        funcSym->getName(),
-        module.get()
-    );
+llvm::Function *CodeGenCtx ::createFunctionProto(const FuncSymbol *funcSym,
+                                                 llvm::FunctionType *fnType,
+                                                 Environment::Env env) {
+    auto func =
+        llvm::Function::Create(fnType, llvm::GlobalValue::ExternalLinkage,
+                               funcSym->getName(), module.get());
     verifyFunction(*func);
     env->bindFunc(funcSym, func);
     return func;
@@ -114,24 +122,104 @@ void CodeGenCtx::createFunctionBlock(llvm::Function *fn) {
     builder->SetInsertPoint(entry);
 }
 
-llvm::BasicBlock *CodeGenCtx::createBasicBlock(const std::string &bbName, llvm::Function *parentFunc) {
+llvm::BasicBlock *CodeGenCtx::createBasicBlock(const std::string &bbName,
+                                               llvm::Function *parentFunc) {
     return llvm::BasicBlock::Create(getLLVMContext(), bbName, parentFunc);
 }
 
-
 // inherit parent class field
-void CodeGenCtx::buildClassInfo(llvm::StructType *cls, const ClassDef &clsStmt) {
+size_t CodeGenCtx::getTypeSize(llvm::Type *type) {
+    return module->getDataLayout().getTypeAllocSize(type);
 }
-void CodeGenCtx::buildClassBody(llvm::StructType *cls) {
+
+// allocate an object of a given class on the heap
+llvm::Value *CodeGenCtx::mallocInstance(llvm::StructType *cls,
+                                        const std::string &name) {
+    auto typeSize = builder->getInt64(getTypeSize(cls));
+
+    // auto mallocPtr = builder->CreateCall(module->getFunction("GC_malloc"),
+    // typeSize, name);
+    auto mallocPtr = nullptr;
+    // void* -> Point*
+    auto instance = builder->CreatePointerCast(mallocPtr, cls->getPointerTo());
+
+    // set vtable
+    std::string className{cls->getName().data()};
+    auto vTableName = className + "_vTable";
+    auto vTableAddr = builder->CreateStructGEP(cls, instance, VTABLE_INDEX);
+    auto vTable = module->getNamedGlobal(vTableName);
+
+    builder->CreateStore(vTable, vTableAddr);
+
+    return instance;
 }
-void CodeGenCtx::buildVTable(llvm::StructType *cls, ClassInfo *classInfo) {
+void CodeGenCtx::buildClassInfo(llvm::StructType *cls, const ClassDef &node,
+                                Environment::Env env) {
+    string clsName = node.identifier();
+    auto &classInfo = classMap[clsName];
+    // member variable need to be added outside of the class
+    // add using code like cls.a=1; and visit as well
+
+    // now suppport declare variable in class
+    for (auto &method : node.methodList()) {
+        auto funcSym = method->funcHeader()->symbol();
+        string methodName = clsName + "_" + method->funcHeader()->identifier();
+        auto methodSig = buildSignature(funcSym);
+        auto llvmFuncType =
+            llvm::FunctionType::get(methodSig.retTy, methodSig.paramTys, false);
+        classInfo->methodsMap[methodName] =
+            createFunction(funcSym, llvmFuncType, env);
+    }
+    for (auto &field : node.fieldList()) {
+        auto &fieldNames = field->identifiers();
+        for (auto &sym : field->symbols()) {
+            auto fieldType = getLLVMType(*sym->getType());
+            classInfo->fieldsMap[sym->getName()] = fieldType;
+        }
+    }
+    buildClassBody(cls);
 }
-size_t CodeGenCtx::getFieldIndex(llvm::StructType *cls, const std::string &fieldName) {
+void CodeGenCtx::buildClassBody(llvm::StructType *cls) {}
+void CodeGenCtx::buildVTable(llvm::StructType *cls, ClassInfo *classInfo) {}
+size_t CodeGenCtx::getFieldIndex(llvm::StructType *cls,
+                                 const std::string &fieldName) {
     return 0;
 }
-size_t CodeGenCtx::getMethodIndex(llvm::StructType *cls, const std::string &methodName) {
+size_t CodeGenCtx::getMethodIndex(llvm::StructType *cls,
+                                  const std::string &methodName) {
     return 0;
 }
 bool CodeGenCtx::isMethod(llvm::StructType *cls, const std::string &name) {
     return false;
+}
+
+CodeGenCtx::FuncSignature CodeGenCtx::buildSignature(const FuncSymbol *funcSym,
+                                                     bool isMain) {
+    CodeGenCtx::FuncSignature sig;
+    sig.paramTys.clear();
+
+    // build parameter types of function
+    if (funcSym) {
+        for (const auto &p : funcSym->getParams()) {
+            const bool byRef = p->getPass() == Symbol::ParamPass::BY_REF;
+            llvm::Type *ty = byRef ? llvm::PointerType::get(getLLVMContext(), 0)
+                                   : getLLVMType(*p->getType(), true);
+            sig.paramTys.push_back(ty);
+        }
+    }
+
+    if (!isMain) {
+        auto *fnSig =
+            funcSym ? static_cast<const FuncType *>(funcSym->getType().get())
+                    : nullptr;
+        sig.retTy = (fnSig && fnSig->returnType())
+                        ? getLLVMType(*fnSig->returnType())
+                        : llvm::Type::getVoidTy(getLLVMContext());
+    } else {
+        // if this functino is not main funciton, we just return 0;
+        sig.retTy = llvm::Type::getInt32Ty(getLLVMContext());
+        sig.paramTys.clear();
+    }
+
+    return sig;
 }

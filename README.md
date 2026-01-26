@@ -4,29 +4,31 @@
 ________________________________________
 |               |\__/,|   (`\          |
 |             _.|o o  |_   ) )         |
-|-------------(((---(((----------------|        
-|      ___          ___                |       
-|     /  /\        /  /\        ___    |       
-|    /  /:/       /  /::\      /  /\   |       
-|   /  /:/       /  /:/\:\    /  /:/   |       
-|  /  /:/  ___  /  /:/~/::\  /  /:/    |       
-| /__/:/  /  /\/__/:/ /:/\:\/  /::\    |       
-| \  \:\ /  /:/\  \:\/:/__\/__/:/\:\   |       
-|  \  \:\  /:/  \  \::/    \__\/  \:\  |        
-|   \  \:\/:/    \  \:\         \  \:\ |        
-|    \  \::/      \  \:\         \__\/ |       
-|     \__\/        \__\/               |      
+|-------------(((---(((----------------|
+|      ___          ___                |
+|     /  /\        /  /\        ___    |
+|    /  /:/       /  /::\      /  /\   |
+|   /  /:/       /  /:/\:\    /  /:/   |
+|  /  /:/  ___  /  /:/~/::\  /  /:/    |
+| /__/:/  /  /\/__/:/ /:/\:\/  /::\    |
+| \  \:\ /  /:/\  \:\/:/__\/__/:/\:\   |
+|  \  \:\  /:/  \  \::/    \__\/  \:\  |
+|   \  \:\/:/    \  \:\         \  \:\ |
+|    \  \::/      \  \:\         \__\/ |
+|     \__\/        \__\/               |
 |______________________________________|
 ```
 
 ## Info
-This project integrates JIT compiler using LLVM and VM-based interpreter.
 
+This project integrates JIT compiler using LLVM and VM-based interpreter.
 
 ...
 
 ## syntax
+
 ### variable
+
 ```python
 var a:int = 1;
 var a:double = 1.1;
@@ -39,6 +41,7 @@ var:str = "hello, catlang!"
 ```
 
 ### control flow
+
 ```python
 if (true)
 {
@@ -51,9 +54,11 @@ else
 ```
 
 ### loop
+
 only support while
 
 developing for loop in python style...
+
 ```python
 while(cond){
     statement...;
@@ -61,7 +66,9 @@ while(cond){
 ```
 
 ### function
+
 closure? overload?
+
 ```python
 def add(x:int, y:int)->int
 {
@@ -70,8 +77,10 @@ def add(x:int, y:int)->int
 ```
 
 ### list
+
 nested list? Idk...(support!)
 rvalue subsript is not supported now...
+
 ```python
 var l:list<int> = [1, 2, 3];
 var s:int = l[0];
@@ -84,10 +93,12 @@ var t2:int = s[0];
 ```
 
 ### class
-support "__call__" magic method, inheritance and ploymorphism.
+
+support "**call**" magic method, inheritance and ploymorphism.
 
 more magic methods developping?
-``` python
+
+```python
 class base
 {
     init(self){}
@@ -119,10 +130,9 @@ derived_class.method();
 ```
 
 ## How to use
+
 - install cmake, llvm-14, libgc, (ninja)
 - mkdir build && cd build
 - cmake -G (Ninja) ../
 - ninja ./
 - If you set isUseJIT = flase, you need to use clang++ to compile the .ll file to ELF file.
-
-

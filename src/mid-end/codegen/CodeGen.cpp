@@ -22,49 +22,12 @@ llvm::Value *CodeGen::lastValue = nullptr;
 // ------------------------------------------------------------------------------------------------------
 
 // factory function to build function signature from FuncSymbol
-static FuncSignature buildSignature(CodeGenCtx &ctx, const FuncSymbol *funcSym, bool isMain = false) {
-    FuncSignature sig;
-    sig.paramTys.clear();
-
-    // build parameter types of function
-    if (funcSym) {
-        for (const auto &p: funcSym->getParams()) {
-            const bool byRef = p->getPass() == Symbol::ParamPass::BY_REF;
-            llvm::Type *ty = byRef ? llvm::PointerType::get(ctx.getLLVMContext(), 0)
-                                   : ctx.getLLVMType(*p->getType(), true);
-            sig.paramTys.push_back(ty);
-        }
-    }
-
-    if (!isMain) {
-        auto *fnSig = funcSym ? static_cast<const FuncType *>(funcSym->getType().get()) : nullptr;
-        sig.retTy = (fnSig && fnSig->returnType()) ? ctx.getLLVMType(*fnSig->returnType())
-                                                   : llvm::Type::getVoidTy(ctx.getLLVMContext());
-    } else {
-        // if this functino is not main funciton, we just return 0;
-        sig.retTy = llvm::Type::getInt32Ty(ctx.getLLVMContext());
-        sig.paramTys.clear();
-    }
-
-    return sig;
-}
-
-static bool hasNestedFuncDefs(const vec<uptr<Def>> &defs) {
-    for (const auto &defn: defs) {
-        if (dynamic_cast<FuncDef *>(defn.get())) {
-            return true;
-        }
-    }
-    return false;
-}
 
 // ------------------------------------------------------------------------------------------------------
-CodeGen::CodeGen(CodeGenCtx &ctx) : ctx(ctx) {
-    setupGlobalEnvironment();
-}
+CodeGen::CodeGen(CodeGenCtx &ctx) : ctx(ctx) { setupGlobalEnvironment(); }
 
 void CodeGen::visit(Program &node) {
-    for (const auto &def: node.getDefs()) {
+    for (const auto &def : node.getDefs()) {
         def->accept(*this);
     }
 }
@@ -79,7 +42,7 @@ void CodeGen::visit(VarDef &node) {
     const auto &initExprOpt = node.initExpr();
     // if there is no initializer
     if (!initExprOpt.has_value()) {
-        for (auto *sym: syms) {
+        for (auto *sym : syms) {
             string name = sym->getName();
             llvm::Type *llvmType = ctx.getLLVMType(*sym->getType());
             auto varAddr = ctx.createLocalVariable(sym, llvmType, currentEnv);
@@ -92,7 +55,7 @@ void CodeGen::visit(VarDef &node) {
     const auto &initExpr = initExprOpt.value();
     initExpr->accept(*this);
     // for each symbol, allocate variable and store the initialized value
-    for (auto *sym: syms) {
+    for (auto *sym : syms) {
         string name = sym->getName();
         llvm::Type *llvmType = ctx.getLLVMType(*sym->getType());
         auto varAddr = ctx.createLocalVariable(sym, llvmType, currentEnv);
@@ -110,7 +73,7 @@ void CodeGen::visit(FuncDecl &node) {
         return;
     }
 
-    auto sig = buildSignature(ctx, funcSym);
+    auto sig = ctx.buildSignature(funcSym);
     ensureLLVMFunction(funcSym, sig);
     lastValue = nullptr;
 }
@@ -128,7 +91,7 @@ void CodeGen::visit(FuncDef &node) {
     auto prevEnv = currentEnv;
 
     const bool is_main = node.isEntrypoint();
-    auto sig = buildSignature(ctx, funcSym, is_main);
+    auto sig = ctx.buildSignature(funcSym, is_main);
     // get function type (params type + return type)
     auto funcType = llvm::FunctionType::get(sig.retTy, sig.paramTys, false);
 
@@ -140,14 +103,14 @@ void CodeGen::visit(FuncDef &node) {
     // store parameters in function
     currentEnv = std::make_shared<Environment>(currentEnv);
     unsigned idx = 0;
-    for (auto &arg: newFunction->args()) {
+    for (auto &arg : newFunction->args()) {
         auto paramSym = funcSym->getParams().at(idx++);
         arg.setName(paramSym->getName());
 
-        auto argBinding = ctx.createLocalVariable(paramSym, arg.getType(), currentEnv);
+        auto argBinding =
+            ctx.createLocalVariable(paramSym, arg.getType(), currentEnv);
         ctx.getBuilder().CreateStore(&arg, argBinding);
     }
-
 
     body->accept(*this);
 
@@ -167,11 +130,29 @@ void CodeGen::visit(FuncDef &node) {
 
     lastValue = nullptr;
 }
-void CodeGen::visit(ClassDef &node) {}
+void CodeGen::visit(ClassDef &node) {
+    string clsName = node.identifier();
+    auto parent = nullptr;
+    const auto &fields = node.fieldList();
+    const auto &methods = node.methodList();
+
+    // create cls
+    ctx.curCls = llvm::StructType::create(ctx.getLLVMContext(), clsName);
+    // TODO: inherence
+    if (parent != nullptr) {
+        // do something
+    } else {
+        auto clsInfo =
+            std::make_unique<CodeGenCtx::ClassInfo>(ctx.curCls, parent);
+        ctx.addClsMap(clsName, std::move(clsInfo));
+    }
+    // populate class with fields and methods
+    ctx.buildClassInfo(ctx.curCls, node, currentEnv);
+}
 void CodeGen::visit(Block &node) {
     Environment::Env env = std::make_shared<Environment>(currentEnv);
     EnvironmentGuard env_guard{*this, env};
-    for (auto &stmt: node.statementsList()) {
+    for (auto &stmt : node.statementsList()) {
         stmt->accept(*this);
     }
 }
@@ -179,8 +160,8 @@ void CodeGen::visit(Block &node) {
 void CodeGen::visit(SkipStmt &node) {}
 void CodeGen::visit(ExitStmt &node) {}
 void CodeGen::visit(AssignStmt &node) {
-    llvm::Value *rhsValue = nullptr;// rval or lval
-    llvm::Value *lhsAddr = nullptr; // lval address
+    llvm::Value *rhsValue = nullptr; // rval or lval
+    llvm::Value *lhsAddr = nullptr;  // lval address
 
     if (auto *rhs = node.right()) {
         rhs->accept(*this);
@@ -191,7 +172,7 @@ void CodeGen::visit(AssignStmt &node) {
         lhsAddr = lastValue;
     }
     if (lhsAddr && rhsValue) {
-        ctx.getBuilder().CreateStore(rhsValue, lhsAddr);// store lhs -> rhs
+        ctx.getBuilder().CreateStore(rhsValue, lhsAddr); // store lhs -> rhs
     }
     lastValue = nullptr;
 }
@@ -220,13 +201,14 @@ void CodeGen::visit(IfStmt &node) {
 
     llvm::BasicBlock *endBlock = ctx.createBasicBlock("if.end", parentFunc);
     Block *elseBlockNode = node.elseBlock();
-    llvm::BasicBlock *elseBlock = elseBlockNode ? ctx.createBasicBlock("if.else", parentFunc) : endBlock;
+    llvm::BasicBlock *elseBlock =
+        elseBlockNode ? ctx.createBasicBlock("if.else", parentFunc) : endBlock;
 
-    //collect all branches
+    // collect all branches
     vec<std::pair<Cond *, Block *>> branches;
     // add if-then branch
     branches.emplace_back(node.conditionExpr(), node.thenBlock());
-    for (const auto &elifPair: node.elifs()) {
+    for (const auto &elifPair : node.elifs()) {
         branches.emplace_back(elifPair.first.get(), elifPair.second.get());
     }
 
@@ -236,8 +218,11 @@ void CodeGen::visit(IfStmt &node) {
         Block *bodyNode = branches[i].second;
         bool lastBranch = (i == branches.size() - 1);
 
-        llvm::BasicBlock *thenBlock = ctx.createBasicBlock("if.then", parentFunc);
-        llvm::BasicBlock *falseBlock = lastBranch ? elseBlock : ctx.createBasicBlock("if.else", parentFunc);
+        llvm::BasicBlock *thenBlock =
+            ctx.createBasicBlock("if.then", parentFunc);
+        llvm::BasicBlock *falseBlock =
+            lastBranch ? elseBlock
+                       : ctx.createBasicBlock("if.else", parentFunc);
 
         // generate condition
         ctx.getBuilder().SetInsertPoint(condBB);
@@ -302,7 +287,6 @@ void CodeGen::visit(LoopStmt &node) {
     ctx.getBuilder().SetInsertPoint(endBlock);
 }
 
-
 void CodeGen::visit(IdLVal &node) {
     auto sym = node.symbol();
     lastValue = currentEnv->lookup(sym);
@@ -311,22 +295,16 @@ void CodeGen::visit(StringLiteralLVal &node) {
     const std::string &literal = node.literal();
     // remove the surrounding quotes
     string content = literal.substr(1, literal.size() - 2);
-    auto *constStr = llvm::ConstantDataArray::getString(
-        ctx.getLLVMContext(), content, true
-    );
+    auto *constStr =
+        llvm::ConstantDataArray::getString(ctx.getLLVMContext(), content, true);
     auto *arrayTy = constStr->getType();
 
     static int strCounter = 0;
     std::string globalName = ".str." + std::to_string(strCounter++);
 
-    auto *global = new llvm::GlobalVariable(
-        ctx.getModule(),
-        arrayTy,
-        true,
-        llvm::GlobalValue::PrivateLinkage,
-        constStr,
-        globalName
-    );
+    auto *global = new llvm::GlobalVariable(ctx.getModule(), arrayTy, true,
+                                            llvm::GlobalValue::PrivateLinkage,
+                                            constStr, globalName);
     global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
     lastValue = global;
 }
@@ -352,7 +330,9 @@ void CodeGen::visit(IndexLVal &node) {
     // basePtr -> address of the array in memory
     // indexVal -> evaluated expression inside brackets
     if (!basePtr->getType()->isIntegerTy(32)) {
-        indexVal = ctx.getBuilder().CreateIntCast(indexVal, llvm::Type::getInt32Ty(ctx.getLLVMContext()), true, "idx.cast");
+        indexVal = ctx.getBuilder().CreateIntCast(
+            indexVal, llvm::Type::getInt32Ty(ctx.getLLVMContext()), true,
+            "idx.cast");
     }
 
     auto *baseElemType = basePtr->getType();
@@ -360,7 +340,8 @@ void CodeGen::visit(IndexLVal &node) {
         lastValue = nullptr;
         return;
     }
-    const auto *baseSema = node.baseExpr() ? node.baseExpr()->type().get() : nullptr;
+    const auto *baseSema =
+        node.baseExpr() ? node.baseExpr()->type().get() : nullptr;
     const auto *elemSema = node.type() ? node.type().get() : nullptr;
     llvm::Type *elemType = elemSema ? ctx.getLLVMType(*elemSema) : nullptr;
     if (!elemType) {
@@ -372,41 +353,34 @@ void CodeGen::visit(IndexLVal &node) {
         const auto &arrayTy = static_cast<const ArrayType &>(*baseSema);
         if (arrayTy.size()) {
             auto arrayLLVMTy = ctx.getLLVMType(*baseSema, false);
-            auto zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx.getLLVMContext()), 0);
+            auto zero = llvm::ConstantInt::get(
+                llvm::Type::getInt32Ty(ctx.getLLVMContext()), 0);
             lastValue = ctx.getBuilder().CreateInBoundsGEP(
-                arrayLLVMTy,
-                basePtr,
-                {zero, indexVal},
-                "array.idx"
-            );
+                arrayLLVMTy, basePtr, {zero, indexVal}, "array.idx");
             return;
         }
-        lastValue = ctx.getBuilder().CreateInBoundsGEP(
-            elemType,
-            basePtr,
-            indexVal,
-            "ptr.idx"
-        );
+        lastValue = ctx.getBuilder().CreateInBoundsGEP(elemType, basePtr,
+                                                       indexVal, "ptr.idx");
     }
-    lastValue = ctx.getBuilder().CreateInBoundsGEP(
-        elemType,
-        basePtr,
-        indexVal,
-        "elem.idx"
-    );
+    lastValue = ctx.getBuilder().CreateInBoundsGEP(elemType, basePtr, indexVal,
+                                                   "elem.idx");
 }
 void CodeGen::visit(MemberAccessLVal &node) {}
 void CodeGen::visit(IntConst &node) {
-    lastValue = llvm::ConstantInt::get(ctx.getLLVMContext(), llvm::APInt(32, node.getValue(), true));
+    lastValue = llvm::ConstantInt::get(ctx.getLLVMContext(),
+                                       llvm::APInt(32, node.getValue(), true));
 }
 void CodeGen::visit(CharConst &node) {
-    lastValue = llvm::ConstantInt::get(ctx.getLLVMContext(), llvm::APInt(8, node.getValue(), false));
+    lastValue = llvm::ConstantInt::get(ctx.getLLVMContext(),
+                                       llvm::APInt(8, node.getValue(), false));
 }
 void CodeGen::visit(TrueConst &node) {
-    lastValue = llvm::ConstantInt::get(ctx.getLLVMContext(), llvm::APInt(8, 1, false));
+    lastValue =
+        llvm::ConstantInt::get(ctx.getLLVMContext(), llvm::APInt(8, 1, false));
 }
 void CodeGen::visit(FalseConst &node) {
-    lastValue = llvm::ConstantInt::get(ctx.getLLVMContext(), llvm::APInt(8, 0, false));
+    lastValue =
+        llvm::ConstantInt::get(ctx.getLLVMContext(), llvm::APInt(8, 0, false));
 }
 void CodeGen::visit(LValueExpr &node) {
     node.lvalue()->accept(*this);
@@ -433,21 +407,24 @@ void CodeGen::visit(UnaryExpr &node) {
     node.operandExpr()->accept(*this);
     llvm::Value *operand = lastValue;
 
-    if (!operand) return;
+    if (!operand)
+        return;
 
     switch (node.opKind()) {
-        case UnOp::Plus:
-            lastValue = operand;
-            break;
-        case UnOp::Minus:
-            lastValue = ctx.getBuilder().CreateNeg(operand, "neg");
-            break;
-        case UnOp::Not: {
-            auto *zero = llvm::ConstantInt::get(operand->getType(), 0);
-            auto *isZero = ctx.getBuilder().CreateICmpEQ(operand, zero, "not.cmp");
-            // The result of ICmp is i1 (1-bit). We need to extend it back to i8 (byte).
-            lastValue = ctx.getBuilder().CreateZExt(isZero, operand->getType(), "not.res");
-        } break;
+    case UnOp::Plus:
+        lastValue = operand;
+        break;
+    case UnOp::Minus:
+        lastValue = ctx.getBuilder().CreateNeg(operand, "neg");
+        break;
+    case UnOp::Not: {
+        auto *zero = llvm::ConstantInt::get(operand->getType(), 0);
+        auto *isZero = ctx.getBuilder().CreateICmpEQ(operand, zero, "not.cmp");
+        // The result of ICmp is i1 (1-bit). We need to extend it back to i8
+        // (byte).
+        lastValue =
+            ctx.getBuilder().CreateZExt(isZero, operand->getType(), "not.res");
+    } break;
     }
 }
 void CodeGen::visit(BinaryExpr &node) {
@@ -463,60 +440,60 @@ void CodeGen::visit(BinaryExpr &node) {
     }
 
     switch (node.opKind()) {
-        case BinOp::Add:
-            lastValue = ctx.getBuilder().CreateAdd(lhs, rhs, "add");
-            break;
-        case BinOp::Sub:
-            lastValue = ctx.getBuilder().CreateSub(lhs, rhs, "sub");
-            break;
-        case BinOp::Mul:
-            lastValue = ctx.getBuilder().CreateMul(lhs, rhs, "mul");
-            break;
-        case BinOp::Div:
-            // Assuming signed division for 'int', unsigned for 'byte'
-            if (lhs->getType()->isIntegerTy(8)) {
-                lastValue = ctx.getBuilder().CreateUDiv(lhs, rhs, "div.u");
-            } else {
-                lastValue = ctx.getBuilder().CreateSDiv(lhs, rhs, "div.s");
-            }
-            break;
-        case BinOp::Mod:
-            if (lhs->getType()->isIntegerTy(8)) {
-                lastValue = ctx.getBuilder().CreateURem(lhs, rhs, "rem.u");
-            } else {
-                lastValue = ctx.getBuilder().CreateSRem(lhs, rhs, "rem.s");
-            }
-            break;
-        case BinOp::AndBits:
-            lastValue = ctx.getBuilder().CreateAnd(lhs, rhs, "and.bits");
-            break;
-        case BinOp::OrBits:
-            lastValue = ctx.getBuilder().CreateOr(lhs, rhs, "or.bits");
-            break;
-        case BinOp::Eq:
-            lastValue = ctx.getBuilder().CreateICmpEQ(lhs, rhs, "eq");
-            break;
-        case BinOp::Ne:
-            lastValue = ctx.getBuilder().CreateICmpNE(lhs, rhs, "neq");
-            break;
-        case BinOp::Lt:
-            lastValue = ctx.getBuilder().CreateICmpSLT(lhs, rhs, "lt");
-            break;
-        case BinOp::Le:
-            lastValue = ctx.getBuilder().CreateICmpSLE(lhs, rhs, "le");
-            break;
-        case BinOp::Gt:
-            lastValue = ctx.getBuilder().CreateICmpSGT(lhs, rhs, "gt");
-            break;
-        case BinOp::Ge:
-            lastValue = ctx.getBuilder().CreateICmpSGE(lhs, rhs, "ge");
-            break;
-        case BinOp::And:
-            lastValue = ctx.getBuilder().CreateAnd(lhs, rhs, "and.logical");
-            break;
-        case BinOp::Or:
-            lastValue = ctx.getBuilder().CreateOr(lhs, rhs, "or.logical");
-            break;
+    case BinOp::Add:
+        lastValue = ctx.getBuilder().CreateAdd(lhs, rhs, "add");
+        break;
+    case BinOp::Sub:
+        lastValue = ctx.getBuilder().CreateSub(lhs, rhs, "sub");
+        break;
+    case BinOp::Mul:
+        lastValue = ctx.getBuilder().CreateMul(lhs, rhs, "mul");
+        break;
+    case BinOp::Div:
+        // Assuming signed division for 'int', unsigned for 'byte'
+        if (lhs->getType()->isIntegerTy(8)) {
+            lastValue = ctx.getBuilder().CreateUDiv(lhs, rhs, "div.u");
+        } else {
+            lastValue = ctx.getBuilder().CreateSDiv(lhs, rhs, "div.s");
+        }
+        break;
+    case BinOp::Mod:
+        if (lhs->getType()->isIntegerTy(8)) {
+            lastValue = ctx.getBuilder().CreateURem(lhs, rhs, "rem.u");
+        } else {
+            lastValue = ctx.getBuilder().CreateSRem(lhs, rhs, "rem.s");
+        }
+        break;
+    case BinOp::AndBits:
+        lastValue = ctx.getBuilder().CreateAnd(lhs, rhs, "and.bits");
+        break;
+    case BinOp::OrBits:
+        lastValue = ctx.getBuilder().CreateOr(lhs, rhs, "or.bits");
+        break;
+    case BinOp::Eq:
+        lastValue = ctx.getBuilder().CreateICmpEQ(lhs, rhs, "eq");
+        break;
+    case BinOp::Ne:
+        lastValue = ctx.getBuilder().CreateICmpNE(lhs, rhs, "neq");
+        break;
+    case BinOp::Lt:
+        lastValue = ctx.getBuilder().CreateICmpSLT(lhs, rhs, "lt");
+        break;
+    case BinOp::Le:
+        lastValue = ctx.getBuilder().CreateICmpSLE(lhs, rhs, "le");
+        break;
+    case BinOp::Gt:
+        lastValue = ctx.getBuilder().CreateICmpSGT(lhs, rhs, "gt");
+        break;
+    case BinOp::Ge:
+        lastValue = ctx.getBuilder().CreateICmpSGE(lhs, rhs, "ge");
+        break;
+    case BinOp::And:
+        lastValue = ctx.getBuilder().CreateAnd(lhs, rhs, "and.logical");
+        break;
+    case BinOp::Or:
+        lastValue = ctx.getBuilder().CreateOr(lhs, rhs, "or.logical");
+        break;
     }
 }
 
@@ -527,9 +504,10 @@ void CodeGen::visit(ArrayExpr &node) {
     }
 
     const auto semaTy = node.type();
-    const auto *arraySema = semaTy ? dynamic_cast<const ArrayType *>(semaTy.get()) : nullptr;
+    const auto *arraySema =
+        semaTy ? dynamic_cast<const ArrayType *>(semaTy.get()) : nullptr;
     if (!arraySema || !arraySema->size().has_value()) {
-        return;// only arrat literal with length supported
+        return; // only arrat literal with length supported
     }
 
     llvm::Type *elemTy = ctx.getLLVMType(*arraySema->elementType());
@@ -539,7 +517,8 @@ void CodeGen::visit(ArrayExpr &node) {
 
     auto *arrayTy = llvm::ArrayType::get(elemTy, *arraySema->size());
     auto *arrayPtr = ctx.getBuilder().CreateAlloca(arrayTy, nullptr, "arr.lit");
-    auto *zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx.getLLVMContext()), 0);
+    auto *zero =
+        llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx.getLLVMContext()), 0);
 
     for (std::size_t i = 0; i < elems.size(); ++i) {
         elems[i]->accept(*this);
@@ -550,60 +529,60 @@ void CodeGen::visit(ArrayExpr &node) {
         // 简单的整数/指针类型对齐
         if (elemVal->getType() != elemTy) {
             if (elemVal->getType()->isIntegerTy() && elemTy->isIntegerTy()) {
-                elemVal = ctx.getBuilder().CreateIntCast(
-                    elemVal,
-                    elemTy,
-                    true,
-                    "arr.elem.cast"
-                );
-            } else if (elemVal->getType()->isPointerTy() && elemTy->isPointerTy()) {
-                elemVal = ctx.getBuilder().CreateBitCast(
-                    elemVal,
-                    elemTy,
-                    "arr.elem.cast"
-                );
+                elemVal = ctx.getBuilder().CreateIntCast(elemVal, elemTy, true,
+                                                         "arr.elem.cast");
+            } else if (elemVal->getType()->isPointerTy() &&
+                       elemTy->isPointerTy()) {
+                elemVal = ctx.getBuilder().CreateBitCast(elemVal, elemTy,
+                                                         "arr.elem.cast");
             }
         }
-        auto *idxConst = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx.getLLVMContext()), i);
+        auto *idxConst = llvm::ConstantInt::get(
+            llvm::Type::getInt32Ty(ctx.getLLVMContext()), i);
         auto *slot = ctx.getBuilder().CreateInBoundsGEP(
-            arrayTy,
-            arrayPtr,
-            {zero, idxConst},
-            "arr.slot"
-        );
+            arrayTy, arrayPtr, {zero, idxConst}, "arr.slot");
         ctx.getBuilder().CreateStore(elemVal, slot);
     }
 
     lastValue = ctx.getBuilder().CreateLoad(arrayTy, arrayPtr, "arr.val");
 }
 
-void CodeGen::visit(ExprCond &node) {
-    node.expression()->accept(*this);
-}
-
+void CodeGen::visit(ExprCond &node) { node.expression()->accept(*this); }
 
 // make sure that function symbol has corresponding LLVM function in module
-llvm::Function *CodeGen::ensureLLVMFunction(FuncSymbol *funcSym, const FuncSignature &sig, const bool is_main) {
+llvm::Function *
+CodeGen::ensureLLVMFunction(FuncSymbol *funcSym,
+                            const CodeGenCtx::FuncSignature &sig,
+                            const bool is_main) {
     // look up existing function symbol in module
-    if (!funcSym) return nullptr;
+    if (!funcSym)
+        return nullptr;
     auto *llvmFunc = currentEnv->lookupFunc(funcSym);
-    if (llvmFunc) return llvmFunc;
+    if (llvmFunc)
+        return llvmFunc;
 
     std::vector<llvm::Type *> fnArgTypes;
-    fnArgTypes.insert(fnArgTypes.end(), sig.paramTys.begin(), sig.paramTys.end());
+    fnArgTypes.insert(fnArgTypes.end(), sig.paramTys.begin(),
+                      sig.paramTys.end());
 
     auto *llvmFnTy = llvm::FunctionType::get(sig.retTy, fnArgTypes, false);
-    llvmFunc = llvm::Function::Create(llvmFnTy, llvm::GlobalValue::ExternalLinkage, is_main ? "main" : funcSym->getName(), &ctx.getModule());
+    llvmFunc = llvm::Function::Create(
+        llvmFnTy, llvm::GlobalValue::ExternalLinkage,
+        is_main ? "main" : funcSym->getName(), &ctx.getModule());
     currentEnv->bindFunc(funcSym, llvmFunc);
     return llvmFunc;
 }
 
-llvm::Value *CodeGen::makeCall(FuncSymbol *calleeSym, const vec<uptr<Expr>> &args) {
-    if (!calleeSym) return nullptr;
+llvm::Value *CodeGen::makeCall(FuncSymbol *calleeSym,
+                               const vec<uptr<Expr>> &args) {
+    if (!calleeSym)
+        return nullptr;
 
-    // declared function and we can find its LLVM function, parameters and return type
+    // declared function and we can find its LLVM function, parameters and
+    // return type
     llvm::Function *callee = currentEnv->lookupFunc(calleeSym);
-    if (!callee) return nullptr;
+    if (!callee)
+        return nullptr;
 
     auto *functionTy = callee->getFunctionType();
     vec<llvm::Value *> callArgs;
@@ -641,7 +620,8 @@ llvm::Value *CodeGen::makeCall(FuncSymbol *calleeSym, const vec<uptr<Expr>> &arg
         llvm::Value *argValue = nullptr;
 
         if (expr) {
-            const bool byRef = paramSym && paramSym->getPass() == Symbol::ParamPass::BY_REF;
+            const bool byRef =
+                paramSym && paramSym->getPass() == Symbol::ParamPass::BY_REF;
             if (byRef) {
                 if (auto *lvalNode = getLValueNode(expr)) {
                     lvalNode->accept(*this);
@@ -663,10 +643,13 @@ llvm::Value *CodeGen::makeCall(FuncSymbol *calleeSym, const vec<uptr<Expr>> &arg
 
         if (argValue->getType() != parmTy) {
             if (argValue->getType()->isPointerTy() && parmTy->isPointerTy()) {
-                argValue = ctx.getBuilder().CreateBitCast(argValue, parmTy, "arg.cast");
+                argValue = ctx.getBuilder().CreateBitCast(argValue, parmTy,
+                                                          "arg.cast");
 
-            } else if (argValue->getType()->isIntegerTy() && parmTy->isIntegerTy()) {
-                argValue = ctx.getBuilder().CreateIntCast(argValue, parmTy, true, "arg.cast");
+            } else if (argValue->getType()->isIntegerTy() &&
+                       parmTy->isIntegerTy()) {
+                argValue = ctx.getBuilder().CreateIntCast(argValue, parmTy,
+                                                          true, "arg.cast");
             }
         }
         callArgs.push_back(argValue);

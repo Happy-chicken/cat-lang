@@ -12,9 +12,8 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Value.h>
 
-
 class CodeGen : public AstVisitor {
-public:
+  public:
     explicit CodeGen(CodeGenCtx &codegenctx);
     virtual ~CodeGen() = default;
     void compile(sptr<Program> root) {
@@ -24,13 +23,9 @@ public:
         ctx.getModule().print(outLL, nullptr);
     }
 
-    CodeGenCtx &getContext() {
-        return ctx;
-    }
+    CodeGenCtx &getContext() { return ctx; }
 
-    Environment::Env getGlobalEnvironment() const {
-        return globalEnv;
-    }
+    Environment::Env getGlobalEnvironment() const { return globalEnv; }
 
     void visit(Type &node) override;
     void visit(FuncParameterType &node) override;
@@ -71,24 +66,31 @@ public:
     void visit(ExprCond &node) override;
     void visit(ArrayExpr &node) override;
 
-    llvm::Function *ensureLLVMFunction(FuncSymbol *funcSym, const FuncSignature &sig, const bool is_main = false);
+    llvm::Function *ensureLLVMFunction(FuncSymbol *funcSym,
+                                       const CodeGenCtx::FuncSignature &sig,
+                                       const bool is_main = false);
 
-public:
+  public:
     void setupGlobalEnvironment() {
         Environment::ValueMap globalObjects{
-            {new VarSymbol("VERSION", nullptr, Location(0, 0)), ctx.getBuilder().getInt32(42)},
+            {new VarSymbol("VERSION", nullptr, Location(0, 0)),
+             ctx.getBuilder().getInt32(42)},
         };
         Environment::ValueMap globalRecords{};
 
-        for (auto &entry: globalObjects) {
-            globalRecords[entry.first] = ctx.createGlobalVariable(entry.first->getName(), (llvm::Constant *) entry.second);
+        for (auto &entry : globalObjects) {
+            globalRecords[entry.first] = ctx.createGlobalVariable(
+                entry.first->getName(), (llvm::Constant *)entry.second);
         }
-        globalEnv = std::make_shared<Environment>(nullptr, globalRecords, Environment::FuncMap{});
+        globalEnv = std::make_shared<Environment>(nullptr, globalRecords,
+                                                  Environment::FuncMap{});
     }
 
     class EnvironmentGuard {
-    public:
-        EnvironmentGuard(CodeGen &ir_generator, Environment::Env enclosing_env) : ir_generator{ir_generator}, previous_env{ir_generator.currentEnv} {
+      public:
+        EnvironmentGuard(CodeGen &ir_generator, Environment::Env enclosing_env)
+            : ir_generator{ir_generator},
+              previous_env{ir_generator.currentEnv} {
             ir_generator.currentEnv = std::move(enclosing_env);
         }
 
@@ -96,20 +98,19 @@ public:
             ir_generator.currentEnv = std::move(previous_env);
         }
 
-    private:
+      private:
         CodeGen &ir_generator;
         std::shared_ptr<Environment> previous_env;
     };
 
-
-private:
+  private:
     CodeGenCtx &ctx;
     // Result:
     // For Expression nodes: the most recently evaluated computed data result
     // For L-value nodes: memory address
     // For Statements/voids: nullptr
     static llvm::Value *lastValue;
-    Environment::Env globalEnv = nullptr;    // global environment
-    Environment::Env &currentEnv = globalEnv;// current environment
+    Environment::Env globalEnv = nullptr;     // global environment
+    Environment::Env &currentEnv = globalEnv; // current environment
     llvm::Value *makeCall(FuncSymbol *calleeSym, const vec<uptr<Expr>> &args);
 };

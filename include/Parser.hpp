@@ -45,9 +45,11 @@ private:
     uptr<Block> parseBlock();
     uptr<Stmt> parseStmt();
     uptr<Stmt> parseAssignmentOrProcCall();
+    uptr<Stmt> parseExprStmt();
     uptr<IfStmt> parseIfStmt();
     uptr<LoopStmt> parseLoopStmt();
     uptr<Lval> parseLVal();
+    uptr<Expr> parseCall();
     uptr<Expr> parseExpr();
     uptr<Expr> parseLogicalOr();
     uptr<Expr> parseLogicalAnd();

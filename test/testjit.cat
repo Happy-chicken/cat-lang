@@ -1,32 +1,13 @@
-// comment
-//var a:int
-//decl gfunc(a:int)
-//class A {
-//    var a:int
-//    def method()->int{
-//        return a
-//    }
-//}
-decl foo()
-
-//def inner() ->int {
-//    var c, d, e:int =1
-//    c = 2 + d
-//    return c
-//}
-
-
-def main() { 
-    //var a :int = 2+2
-    var b:int = 3
-    var c:int[4][2] = [[1,2],[3,4], [5,6],[7,8]]
-    //c = [1,2,3]
-    //while (a > 0){
-        //c[a-1] = a
-        //a = a - 1
-    //}
-    b = c[2][1]
-    print(b)
-    return 0
-    
+class A{
+    var a:int
+    def fn()->int{
+        return a
+    }
+}
+def func()->int{}
+def main() {
+    var a:A
+    //a = func()
+    var b:int
+    b = a.a
 }
