@@ -6,6 +6,7 @@
 #include <ostream>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 template<typename T>
 using vec = std::vector<T>;
@@ -29,6 +30,7 @@ public:
 
     virtual ~Symbol() = default;
     const std::string &getName() const;
+    void setName(const std::string &newname) { name_ = newname; }
     SymKind getKind() const;
 
     const SemaTypePtr &getType() const;
@@ -68,13 +70,17 @@ class VarSymbol : public Symbol {
 public:
     VarSymbol(std::string name, SemaTypePtr type, Location loc)
         : Symbol(std::move(name), SymKind::VAR, std::move(type), loc) {};
+
+protected:
+    VarSymbol(std::string name, SymKind kind, SemaTypePtr type, Location loc)
+        : Symbol(name, kind, std::move(type), loc) {}
 };
 
 // Field is a variable defined in a class
-class FieldSymbol : public Symbol {
+class FieldSymbol : public VarSymbol {
 public:
     FieldSymbol(std::string name, SemaTypePtr type, Location loc)
-        : Symbol(std::move(name), SymKind::FIELD, std::move(type), loc) {};
+        : VarSymbol(std::move(name), SymKind::FIELD, std::move(type), loc) {};
 };
 
 class ParamSymbol : public Symbol {

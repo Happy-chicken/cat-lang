@@ -4,13 +4,12 @@
 #include "SemanticCtx.hpp"
 #include "SemanticPass.hpp"
 class PassDriver {
-public:
-    PassDriver(Program &ast)
-        : astRoot(ast) {}
+  public:
+    PassDriver(Program &ast) : astRoot(ast) {}
 
     void runSemanticPass(SemanticCtx &ctx);
     void runControlFlowPass(SemanticCtx &ctx);
 
-private:
+  private:
     Program &astRoot;
 };

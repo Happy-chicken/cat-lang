@@ -273,7 +273,6 @@ uptr<Stmt> Parser::parseAssignmentOrProcCall() {
     Token token = consume(IDENTIFIER, "Expected identifier.");
     // assigment
     uptr<Lval> left = make_unique<IdLVal>(token.location, token.lexeme);
-    // class member access
 
     // procedure call
     if (match({LEFT_PAREN})) {
@@ -523,9 +522,20 @@ uptr<Expr> Parser::parsePrimary() {
     if (match({FALSE})) {
         return std::make_unique<FalseConst>(loc);
     }
-    // if (match({SUPER})){}
-    // if (match({SELF})) {}
-
+    if (match({NEW})) {
+        Token clsToken = consume(IDENTIFIER, "Expected a class name to construct instance");
+        consume(LEFT_PAREN, "Expected '('");
+        vec<uptr<Expr>> args = parseArguments();
+        consume(RIGHT_PAREN, "Expected ')'");
+        return std::make_unique<NewExpr>(loc, clsToken.lexeme, std::move(args));
+    }
+    // if (match({SUPER})) {
+    //     return std::make_unique<SuperExpr>(loc);
+    // }
+    // if (match({SELF})) {
+    //     return std::make_unique<SelfExpr>(loc);
+    // }
+    //
     // Parenthesized expression
     if (match({LEFT_PAREN})) {
         auto expr = parseExpr();

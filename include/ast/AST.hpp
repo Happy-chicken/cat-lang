@@ -1,5 +1,7 @@
 #pragma once
+#include <cstddef>
 #include <iostream>
+#include <llvm-20/llvm/IR/Intrinsics.h>
 #include <memory>
 #include <optional>
 #include <ostream>
@@ -27,7 +29,7 @@ class Symbol;
 class FuncSymbol;
 class VarSymbol;
 class MethodSymbol;
-
+class ClassSymbol;
 // Base AST Node class
 class ASTNode {
 public:
@@ -213,6 +215,7 @@ private:
     uptr<Type> declared_type;
     vec<VarSymbol *> symbols_;
     std::optional<uptr<Expr>> init_expr_;
+    bool field = false;
 
 public:
     VarDef(Location l, vec<string> ids, uptr<Type> t, optional<uptr<Expr>> init = std::nullopt);
@@ -225,6 +228,9 @@ public:
     Type *declaredType() { return declared_type.get(); }
     const Type *declaredType() const { return declared_type.get(); }
     void print(std::ostream &out) const override;
+    bool isField() const { return field; }
+    void setIsField(bool isField) { field = isField; }
+    void setSymbol(size_t i, VarSymbol *sym) { symbols_[i] = sym; }
 };
 
 class FuncDecl : public Def {
@@ -256,7 +262,7 @@ private:
     uptr<Header> header;
     uptr<Block> body;
     bool isEntrypoint_;
-    bool isMethod_;
+    bool isMethod_ = false;
 };
 
 class ClassDef : public Def {
@@ -267,11 +273,16 @@ public:
     const string &identifier() const { return name; }
     const vec<uptr<VarDef>> &fieldList() const { return fields; }
     const vec<uptr<FuncDef>> &methodList() const { return methods; }
+    vec<uptr<VarDef>> &fieldList() { return fields; }
+    vec<uptr<FuncDef>> &methodList() { return methods; }
+    void addClassSymbol(ClassSymbol *newSym) { classSymbol = newSym; }
+    const ClassSymbol *getClassSymbol() const { return classSymbol; }
 
 private:
     string name;// class name
     vec<uptr<VarDef>> fields;
     vec<uptr<FuncDef>> methods;
+    ClassSymbol *classSymbol;
 };
 // ===== Blocks and statements =====
 class ExpressionStmt : public Stmt {
@@ -518,7 +529,7 @@ private:
 class FuncCall : public Expr {
 public:
     FuncCall(Location l, string id, vec<uptr<Expr>> a);
-    const FuncSymbol *funcSymbol() const { return symbol_; }
+    FuncSymbol *funcSymbol() const { return symbol_; }
     void setFuncSymbol(FuncSymbol *sym) { symbol_ = sym; }
     void accept(AstVisitor &v) override;
     void print(std::ostream &out) const override;
@@ -568,6 +579,19 @@ private:
     MethodSymbol *symbol_ = nullptr;
 };
 
+class NewExpr : public Expr {
+public:
+    NewExpr(Location loc, string clsName, vec<uptr<Expr>> args);
+    void print(std::ostream &out) const override;
+    void accept(AstVisitor &v) override;
+    const string &getCotorName() const { return clsName; }
+    const vec<uptr<Expr>> &getArgs() const { return args; }
+
+private:
+    string clsName;
+    vec<uptr<Expr>> args;
+};
+
 class UnaryExpr : public Expr {
 public:
     UnaryExpr(Location l, UnOp operation, uptr<Expr> expr);
@@ -606,6 +630,30 @@ public:
 private:
     vec<uptr<Expr>> elements;
 };
+
+// class SelfExpr : public Expr {
+// public:
+//     SelfExpr(Location loc);
+//     void accept(AstVisitor &v) override;
+//     void print(std::ostream &out) const override;
+//     const string &getClsName() const { return clsName; }
+//     void setClassName(const string &clsName_) { clsName = clsName_; }
+//
+// private:
+//     string clsName{""};
+// };
+//
+// class SuperExpr : public Expr {
+// public:
+//     SuperExpr(Location loc);
+//     void accept(AstVisitor &v) override;
+//     void print(std::ostream &out) const override;
+//     const string &getClsName() const { return clsName; }
+//     void setClassName(const string &clsName_) { clsName = clsName_; }
+//
+// private:
+//     string clsName{""};
+// };
 
 // ===== Conditions =====
 

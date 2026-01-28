@@ -1,5 +1,6 @@
 #pragma once
 #include "Environment.hpp"
+#include "SemanticCtx.hpp"
 #include "Symbol.hpp"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
@@ -12,29 +13,30 @@
 #include <llvm/IR/Value.h>
 #include <unordered_map>
 #include <utility>
-template <typename T> using uptr = std::unique_ptr<T>;
+template<typename T>
+using uptr = std::unique_ptr<T>;
 static const size_t RESERVED_FIELD_COUNT = 1;
 static const size_t VTABLE_INDEX = 0;
 
 struct ActiveFuncState {
     const FuncSymbol *funcSym;
-    llvm::Value *framePtr = nullptr; // Pointer to the current function's frame
-    llvm::Value *staticLinkPtr = nullptr; // Pointer to the parent frame
+    llvm::Value *framePtr = nullptr;     // Pointer to the current function's frame
+    llvm::Value *staticLinkPtr = nullptr;// Pointer to the parent frame
     std::unordered_map<const Symbol *, llvm::Value *>
-        localVarAddrs; // Local variables address(i.e that var) map
+        localVarAddrs;// Local variables address(i.e that var) map
 
     struct LoopInfo {
         llvm::BasicBlock *breakBB = nullptr;
         llvm::BasicBlock *continueBB = nullptr;
     };
     std::vector<LoopInfo>
-        loopStack; // Stack to manage nested truct FuncSignature {
+        loopStack;// Stack to manage nested truct FuncSignature {
     vec<llvm::Type *> paramTys;
     llvm::Type *retTy;
 };
 
 class CodeGenCtx {
-  public:
+public:
     using FieldMap = std::unordered_map<std::string, llvm::Type *>;
     using MethodMap = std::unordered_map<std::string, llvm::Function *>;
     static llvm::Function *curFunction;
@@ -44,6 +46,7 @@ class CodeGenCtx {
           module(std::make_unique<llvm::Module>(moduleName, *ctx)),
           builder(std::make_unique<llvm::IRBuilder<>>(*ctx)) {
         module->setTargetTriple("x86_64-pc-linux-gnu");
+        module->getOrInsertFunction("malloc", llvm::FunctionType::get(llvm::PointerType::get(*ctx, 0), builder->getInt64Ty(), false));
     }
     ~CodeGenCtx() = default;
 
@@ -59,8 +62,7 @@ class CodeGenCtx {
 
     // class information
     struct ClassInfo {
-        ClassInfo(llvm::StructType *clsTy, llvm::StructType *parTy,
-                  FieldMap &fmap, MethodMap &mmap)
+        ClassInfo(llvm::StructType *clsTy, llvm::StructType *parTy, FieldMap &fmap, MethodMap &mmap)
             : cls(clsTy), parent(parTy), fieldsMap(fmap), methodsMap(mmap) {}
         ClassInfo(llvm::StructType *clsTy, llvm::StructType *party)
             : cls(clsTy), parent(party) {
@@ -77,73 +79,66 @@ class CodeGenCtx {
         vec<llvm::Type *> paramTys;
         llvm::Type *retTy;
     };
-    llvm::StructType *curCls = nullptr; // current class
-
-  private:
+    llvm::StructType *curCls = nullptr;// current class
+    llvm::Value *curThisCls = nullptr; // current this Pointer of current class
+private:
     uptr<llvm::LLVMContext> ctx;
     uptr<llvm::Module> module;
     uptr<llvm::IRBuilder<>> builder;
     uptr<llvm::IRBuilder<>>
-        varsBuilder; // this builder always prepends to the beginning of the
-                     // function entry block
+        varsBuilder;// this builder always prepends to the beginning of the
+                    // function entry block
 
     using ClassMap = std::unordered_map<string, uptr<ClassInfo>>;
-    vec<ActiveFuncState> funcStack; // Stack of active function states
-    ClassMap classMap; // Map of class symbols to their LLVM struct types
+    vec<ActiveFuncState> funcStack;// Stack of active function states
+    ClassMap classMap;             // Map of class symbols to their LLVM struct types
 
-  public:
+public:
     void addClsMap(string clsName, uptr<ClassInfo> clsInfo) {
         classMap[clsName] = std::move(clsInfo);
     }
-    bool lookupClsMap(string clsName) {
+    ClassInfo *lookupClsMap(string clsName) {
         if (classMap.find(clsName) != classMap.end()) {
-            return true;
+            return classMap[clsName].get();
         }
-        return false;
+        return nullptr;
     }
 
-  public:
+public:
     // Type Translation
     llvm::Type *getLLVMType(const SemaType &ty, bool forParam = false);
-    llvm::GlobalVariable *createGlobalVariable(const std::string &name,
-                                               llvm::Constant *init);
+    llvm::GlobalVariable *createGlobalVariable(const std::string &name, llvm::Constant *init);
 
-    llvm::Value *createLocalVariable(Symbol *sym, llvm::Type *type,
-                                     Environment::Env env);
-    llvm::Function *createFunction(const FuncSymbol *funcSym,
-                                   llvm::FunctionType *fnType,
-                                   Environment::Env env);
-    llvm::Function *createFunctionProto(const FuncSymbol *funcSym,
-                                        llvm::FunctionType *fnType,
-                                        Environment::Env env);
+    llvm::Value *createLocalVariable(Symbol *sym, llvm::Type *type, Environment::Env env);
+    llvm::Function *createFunction(const FuncSymbol *funcSym, llvm::FunctionType *fnType, Environment::Env env);
+    llvm::Function *createFunctionProto(const FuncSymbol *funcSym, llvm::FunctionType *fnType, Environment::Env env);
 
-    void createFunctionBlock(llvm::Function *fn); // create a function block
+    void createFunctionBlock(llvm::Function *fn);// create a function block
     llvm::BasicBlock *
     createBasicBlock(const std::string &bbName,
-                     llvm::Function *parentFunc); // create a basic block
+                     llvm::Function *parentFunc);// create a basic block
 
     // methods related to class
     // TODO
     // void inheritClass(llvm::StructType *cls, llvm::StructType *parent); //
     // inherit parent class field
     size_t getTypeSize(llvm::Type *type);
+    llvm::Value *createInstance(const string &clsName, const string &varName, Environment::Env env);
     llvm::Value *
     mallocInstance(llvm::StructType *cls,
-                   const std::string &
-                       name); // allocate an object of a given class on the heap
+                   const std::string &name);// allocate an object of a given class on the heap
     void buildClassInfo(llvm::StructType *cls, const ClassDef &clsStmt,
-                        Environment::Env env);  // build class info
-    void buildClassBody(llvm::StructType *cls); // build class body
+                        Environment::Env env); // build class info
+    void buildClassBody(llvm::StructType *cls);// build class body
     void buildVTable(llvm::StructType *cls,
-                     ClassInfo *classInfo); // build vtable
+                     ClassInfo *classInfo);// build vtable
     size_t getFieldIndex(llvm::StructType *cls,
-                         const std::string &fieldName); // get field index
+                         const std::string &fieldName);// get field index
     size_t getMethodIndex(llvm::StructType *cls,
-                          const std::string &methodName); // get method index
+                          const std::string &methodName);// get method index
     bool isMethod(llvm::StructType *cls,
-                  const std::string &name); // check if a function is a method
+                  const std::string &name);// check if a function is a method
 
     // helper
-    FuncSignature buildSignature(const FuncSymbol *funcSym,
-                                 bool isMain = false);
+    FuncSignature buildSignature(const FuncSymbol *funcSym, bool isMain = false, bool isMethod = false);
 };

@@ -10,6 +10,7 @@
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -35,8 +36,8 @@ void SemanticPass::visit(Program &node) {
 void SemanticPass::visit(Header &node) {}
 void SemanticPass::visit(ClassDef &node) {
     auto cls_name = node.identifier();
-    const auto &fields = node.fieldList();
-    const auto &methods = node.methodList();
+    auto &fields = node.fieldList();
+    auto &methods = node.methodList();
     const SemaTypePtr class_type = makeClassType(cls_name);
 
     LookupResult existing = semanticCtx.lookup(cls_name);
@@ -60,10 +61,14 @@ void SemanticPass::visit(ClassDef &node) {
     // create Class
     semanticCtx.beginScope();
     for (auto &member: fields) {
-        if (member) member->accept(*this);
-
-        // Convert VarSymbols to FieldSymbols for class members
-        for (auto *var_sym: member->symbols()) {
+        if (member) {
+            member->setIsField(true);
+            member->accept(*this);
+        }
+        auto &varSyms = member->symbols();
+        // Convert VarSymbols to FieldSymbols for claHHss members
+        for (auto it = varSyms.begin(); it < varSyms.end(); ++it) {
+            auto &var_sym = *it;
             if (var_sym) {
                 // Create a FieldSymbol with the same properties
                 auto field_sym = std::make_unique<FieldSymbol>(
@@ -73,19 +78,25 @@ void SemanticPass::visit(ClassDef &node) {
                 );
                 field_sym->setDefiningClass(class_sym.get());
                 FieldSymbol *raw_field = field_sym.get();
-
+                member->setSymbol(it - varSyms.begin(), raw_field);
                 // Replace the VarSymbol with FieldSymbol in symbol table
                 semanticCtx.replaceSymbol(var_sym->getName(), std::move(field_sym));
                 class_sym->addField(raw_field);
             }
         }
     }
+    bool hasConstructor = false;
     for (auto &method: methods) {
-        if (method) method->accept(*this);
+        if (method) {
+            method->setIsMethod(true);
+            method->accept(*this);
+        }
         auto *func_header = method->funcHeader();
         if (func_header && func_header->symbol()) {
             auto *func_sym = func_header->symbol();
-
+            if (func_sym->getName() == "constructor") {
+                hasConstructor = true;
+            }
             // Create a MethodSymbol with the same properties
             auto method_sym = std::make_unique<MethodSymbol>(
                 func_sym->getName(),
@@ -105,7 +116,6 @@ void SemanticPass::visit(ClassDef &node) {
             }
 
             MethodSymbol *raw_method = method_sym.get();
-
             // Replace the FuncSymbol with MethodSymbol in symbol table
             semanticCtx.replaceSymbol(func_sym->getName(), std::move(method_sym));
             // Update the AST node to point to the new MethodSymbol
@@ -113,8 +123,18 @@ void SemanticPass::visit(ClassDef &node) {
             class_sym->addMethod(raw_method);
         }
     }
+    if (!hasConstructor) {
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Warning,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            "There is on constructor in class"
+        );
+    }
     semanticCtx.endScope();
+    ClassSymbol *rawClsSym = class_sym.get();
     semanticCtx.declareSymbol(std::move(class_sym));// declare class symbol in current scope
+    node.addClassSymbol(rawClsSym);
 }
 void SemanticPass::visit(FuncDecl &node) {
     auto *header = node.funcHeader();
@@ -460,7 +480,7 @@ void SemanticPass::visit(ProcCall &node) {
     }
     node.setFuncSymbol(funcSym);
     const auto &params = funcSym->getParams();
-    checkArguments(node.arguments(), params, node.identifier(), node.loc);
+    checkArguments(node.arguments(), params, node.identifier(), node.loc) ?: throw std::runtime_error("semantic analysis failed");
 }
 
 void SemanticPass::visit(BinaryExpr &node) {
@@ -876,7 +896,6 @@ void SemanticPass::visit(MethodCall &node) {
         node.setType(nullptr);
         throw std::runtime_error("semantic analysis failed");
     }
-
     node.setMethodSymbol(methodSym);
     const auto &params = methodSym->getParams();
     checkArguments(node.arguments(), params, node.methodName(), node.loc);
@@ -885,6 +904,34 @@ void SemanticPass::visit(MethodCall &node) {
     node.setType(sig ? sig->returnType() : SemaTypePtr{});
     node.setLValue(false);
     node.setAssignable(false);
+}
+
+void SemanticPass::visit(NewExpr &node) {
+    string clsName = node.getCotorName();
+    auto &args = node.getArgs();
+
+    LookupResult clsRes = semanticCtx.lookup(clsName);
+    if (!clsRes.found()) {
+        semanticCtx.getDiagnostics().report(
+            Diagnostics::Severity::Error,
+            Diagnostics::Phase::SemanticAnalysis,
+            node.loc,
+            clsName + " is not class, you can't construct a instance"
+        );
+        throw std::runtime_error("semantic analysis failed");
+    }
+    auto sym = clsRes.symbol;
+    if (auto clsSym = dynamic_cast<ClassSymbol *>(sym)) {
+        for (auto *mSym: clsSym->getMethods()) {
+            if (mSym->getName() == "constructor") {
+                auto &params = mSym->getParams();
+                checkArguments(args, params, "constructor of " + clsName, node.loc);
+                break;
+            }
+        }
+    }
+    SemaTypePtr instTy = makeInstanceType(clsName);
+    node.setType(instTy);
 }
 
 void SemanticPass::visit(ArrayExpr &node) {

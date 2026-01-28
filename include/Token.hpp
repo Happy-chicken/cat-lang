@@ -67,6 +67,7 @@ typedef enum {
     CLASS,
     SUPER,
     SELF,
+    NEW,
     // loop
     WHILE,
     FOR,

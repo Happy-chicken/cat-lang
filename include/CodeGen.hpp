@@ -13,7 +13,7 @@
 #include <llvm/IR/Value.h>
 
 class CodeGen : public AstVisitor {
-  public:
+public:
     explicit CodeGen(CodeGenCtx &codegenctx);
     virtual ~CodeGen() = default;
     void compile(sptr<Program> root) {
@@ -61,16 +61,15 @@ class CodeGen : public AstVisitor {
     void visit(FuncCall &node) override;
     void visit(MemberAccessExpr &node) override;
     void visit(MethodCall &node) override;
+    void visit(NewExpr &node) override;
     void visit(UnaryExpr &node) override;
     void visit(BinaryExpr &node) override;
     void visit(ExprCond &node) override;
     void visit(ArrayExpr &node) override;
 
-    llvm::Function *ensureLLVMFunction(FuncSymbol *funcSym,
-                                       const CodeGenCtx::FuncSignature &sig,
-                                       const bool is_main = false);
+    llvm::Function *ensureLLVMFunction(FuncSymbol *funcSym, const CodeGenCtx::FuncSignature &sig, const bool is_main = false);
 
-  public:
+public:
     void setupGlobalEnvironment() {
         Environment::ValueMap globalObjects{
             {new VarSymbol("VERSION", nullptr, Location(0, 0)),
@@ -78,16 +77,16 @@ class CodeGen : public AstVisitor {
         };
         Environment::ValueMap globalRecords{};
 
-        for (auto &entry : globalObjects) {
+        for (auto &entry: globalObjects) {
             globalRecords[entry.first] = ctx.createGlobalVariable(
-                entry.first->getName(), (llvm::Constant *)entry.second);
+                entry.first->getName(), (llvm::Constant *) entry.second
+            );
         }
-        globalEnv = std::make_shared<Environment>(nullptr, globalRecords,
-                                                  Environment::FuncMap{});
+        globalEnv = std::make_shared<Environment>(nullptr, globalRecords, Environment::FuncMap{});
     }
 
     class EnvironmentGuard {
-      public:
+    public:
         EnvironmentGuard(CodeGen &ir_generator, Environment::Env enclosing_env)
             : ir_generator{ir_generator},
               previous_env{ir_generator.currentEnv} {
@@ -98,19 +97,19 @@ class CodeGen : public AstVisitor {
             ir_generator.currentEnv = std::move(previous_env);
         }
 
-      private:
+    private:
         CodeGen &ir_generator;
         std::shared_ptr<Environment> previous_env;
     };
 
-  private:
+private:
     CodeGenCtx &ctx;
     // Result:
     // For Expression nodes: the most recently evaluated computed data result
     // For L-value nodes: memory address
     // For Statements/voids: nullptr
     static llvm::Value *lastValue;
-    Environment::Env globalEnv = nullptr;     // global environment
-    Environment::Env &currentEnv = globalEnv; // current environment
+    Environment::Env globalEnv = nullptr;    // global environment
+    Environment::Env &currentEnv = globalEnv;// current environment
     llvm::Value *makeCall(FuncSymbol *calleeSym, const vec<uptr<Expr>> &args);
 };

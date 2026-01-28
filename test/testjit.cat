@@ -1,13 +1,20 @@
 class A{
-    var a:int
-    def fn()->int{
-        return a
-    }
+    var b:int 
+    def constructor(arg:int) {
+        b = 100
+      }
+    def m() -> int {
+        var local:int
+        return 1
+      }
 }
-def func()->int{}
+def func()->int{
+    return 1
+  }
 def main() {
-    var a:A
-    //a = func()
-    var b:int
-    b = a.a
+    var a:A = new A( 1)
+    var c:int
+    c = a.m()
+    print(c)
+    print(a.b)
 }

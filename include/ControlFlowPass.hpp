@@ -60,6 +60,7 @@ public:
     void visit(FuncCall &node) override;
     void visit(MemberAccessExpr &node) override;
     void visit(MethodCall &node) override;
+    void visit(NewExpr &node) override;
     void visit(UnaryExpr &node) override;
     void visit(BinaryExpr &node) override;
     void visit(ArrayExpr &node) override;

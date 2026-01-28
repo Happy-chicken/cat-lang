@@ -315,6 +315,10 @@ void MethodCall::print(std::ostream &out) const {
     tree::children(out, args);
 }
 
+void NewExpr::print(std::ostream &out) const {
+    tree::line(out, tree::tag("NewExpr", loc) + " constructor=" + clsName);
+}
+
 void FuncCall::print(std::ostream &out) const {
     tree::line(out, tree::tag("FuncCall", loc) + " name=" + name);
     tree::children(out, args);

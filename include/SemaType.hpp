@@ -140,6 +140,7 @@ public:
     const std::string &className() const;
     bool equals(const SemaType &other) const override;
     void setClassName(const std::string &name);
+    const std::string &getClassName() const { return className_; }
 
 private:
     std::string className_;

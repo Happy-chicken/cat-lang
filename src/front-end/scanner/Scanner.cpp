@@ -19,7 +19,7 @@ const unordered_map<string, TokenType> Scanner::keywords = {
     {"class", CLASS},
     {"super", SUPER},
     {"self", SELF},
-
+    {"new", NEW},
     {"if", IF},
     {"elif", ELIF},
     {"else", ELSE},

@@ -369,6 +369,12 @@ void MethodCall::accept(AstVisitor &v) {
     v.visit(*this);
 }
 
+NewExpr::NewExpr(Location l, string clsName, vec<uptr<Expr>> args)
+    : Expr(l), clsName(std::move(clsName)), args(std::move(args)) {}
+void NewExpr::accept(AstVisitor &v) {
+    v.visit(*this);
+}
+
 UnaryExpr::UnaryExpr(Location l, UnOp operation, uptr<Expr> expr)
     : Expr(l), op(operation), operand(std::move(expr)) {}
 void UnaryExpr::accept(AstVisitor &v) {
@@ -386,6 +392,16 @@ ArrayExpr::ArrayExpr(Location loc, vec<uptr<Expr>> elems) : Expr(loc), elements(
 void ArrayExpr::accept(AstVisitor &v) {
     v.visit(*this);
 }
+
+// SelfExpr::SelfExpr(Location loc) : Expr(loc) {}
+// void SelfExpr::accept(AstVisitor &v) {
+//     v.visit(*this);
+// }
+//
+// SuperExpr::SuperExpr(Location loc) : Expr(loc) {}
+// void SuperExpr::accept(AstVisitor &v) {
+//     v.visit(*this);
+// }
 // ===== Conditions =====
 
 Cond::Cond(Location l)

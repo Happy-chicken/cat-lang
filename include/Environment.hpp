@@ -1,8 +1,10 @@
 #pragma once
 #include "Symbol.hpp"
+#include <llvm-20/llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Value.h>
 #include <memory>
+#include <sstream>
 #include <unordered_map>
 template<typename T>
 using sptr = std::shared_ptr<T>;
@@ -40,6 +42,16 @@ public:
             return env->llvmFuncRecords[sym];
         }
         return nullptr;
+    }
+    string dump() const {
+        std::stringstream sstream;
+        for (auto &valRec: llvmValRecords) {
+            sstream << valRec.first->getName() << ":" << valRec.second->getName().data();
+        }
+        for (auto &funRec: llvmFuncRecords) {
+            sstream << funRec.first->getName() << ":" << funRec.second->getName().data();
+        }
+        return sstream.str();
     }
 
 private:
