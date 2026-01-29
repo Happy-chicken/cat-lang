@@ -9,6 +9,11 @@ public:
     Optimizier();
 
     void optimize(llvm::Module &module, llvm::OptimizationLevel);
+    void save(llvm::Module &module) {
+        std::error_code errorCode;
+        llvm::raw_fd_ostream outLL("./opt.ll", errorCode);
+        module.print(outLL, nullptr);
+    }
 
 private:
     llvm::LoopAnalysisManager loopAM;

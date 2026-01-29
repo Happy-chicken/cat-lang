@@ -108,7 +108,7 @@ void Cat::build(const string &program, llvm::OptimizationLevel optLevel) {
             std::cerr << "Error: Generated LLVM IR is invalid.\n";
             exit(1);
         }
-
+        optimizer.save(codeGenCtx.getModule());
         // ---------------------------------------------------------------------------
 
         // JIT
