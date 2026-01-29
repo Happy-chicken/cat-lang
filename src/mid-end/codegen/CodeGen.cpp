@@ -4,7 +4,6 @@
 #include "Diagnostics.hpp"
 #include "Environment.hpp"
 #include "SemaType.hpp"
-#include "SemanticCtx.hpp"
 #include "Symbol.hpp"
 #include "Token.hpp"
 #include "Types.hpp"
@@ -57,25 +56,23 @@ void CodeGen::visit(VarDef &node) {
 
     // if variable is a instance
     if (type->getName().has_value() && type->data_type() == DataType::DataType::MAY_INSTANCE) {
+        if (initExprOpt.has_value()) {
+            const auto &initExpr = initExprOpt.value();
+            initExpr->accept(*this);
+
+            for (auto *sym: syms) {
+                currentEnv->bind(sym, lastValue);
+            }
+            return;
+        }
+
         for (auto *sym: syms) {
-            auto cls = llvm::StructType::getTypeByName(ctx.getLLVMContext(), type->getName().value());
-            auto instance = ctx.createInstance(cls->getName().data(), sym->getName(), currentEnv);
+            auto cls = llvm::StructType::getTypeByName(
+                ctx.getLLVMContext(), type->getName().value()
+            );
+            auto instance = ctx.mallocInstance(cls, sym->getName());
             currentEnv->bind(sym, instance);
             lastValue = instance;
-            // auto ptrType = llvm::PointerType::get(ctx.getLLVMContext(), 0);
-            // auto varAlloca = ctx.getBuilder().CreateAlloca(
-            //     ptrType,
-            //     nullptr,
-            //     "inst_" + sym->getName()
-            // );
-
-            // if (initExprOpt.has_value()) {
-            //     initExprOpt.value()->accept(*this);
-            //     llvm::Value *instance = lastValue;
-            //     ctx.getBuilder().CreateStore(instance, varAlloca);
-            // }
-            // currentEnv->bind(sym, varAlloca);
-            // lastValue = varAlloca;
         }
         return;
     }
@@ -367,7 +364,7 @@ void CodeGen::visit(LoopStmt &node) {
 void CodeGen::visit(IdLVal &node) {
     auto sym = node.symbol();
     if (auto var = currentEnv->lookup(sym)) {
-        lastValue = var;
+        lastValue = var;// var is actually address value
         return;
     }
     // !it should be a class field
@@ -582,15 +579,16 @@ void CodeGen::visit(MethodCall &node) {
 void CodeGen::visit(NewExpr &node) {
     string clsName = node.getCotorName();
     auto &args = node.getArgs();
+
     auto cls = llvm::StructType::getTypeByName(ctx.getLLVMContext(), clsName);
-    auto instance = ctx.mallocInstance(cls, "obj");
+    auto ctor = ctx.getModule().getFunction(clsName + "_constructor");
+    auto instance = ctx.mallocInstance(cls, "inst");
 
     vec<llvm::Value *> ctorArgs{instance};
     for (auto &arg: args) {
         arg->accept(*this);
         ctorArgs.push_back(lastValue);
     }
-    auto ctor = ctx.getModule().getFunction(clsName + "_constructor");
     ctx.getBuilder().CreateCall(ctor, ctorArgs);
 
     lastValue = instance;

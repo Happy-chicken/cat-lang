@@ -1,6 +1,5 @@
 #pragma once
 #include "Environment.hpp"
-#include "SemanticCtx.hpp"
 #include "Symbol.hpp"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"

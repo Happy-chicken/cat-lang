@@ -1,7 +1,7 @@
 class A{
     var b:int 
     def constructor(arg:int) {
-        b = 100
+        b = arg
       }
     def m() -> int {
         var local:int

@@ -1,9 +1,7 @@
 #include "CodeGenCtx.hpp"
 #include "AST.hpp"
-#include "CodeGen.hpp"
 #include "Environment.hpp"
 #include "SemaType.hpp"
-#include "SemanticCtx.hpp"
 #include "Symbol.hpp"
 #include <cstddef>
 #include <iterator>
