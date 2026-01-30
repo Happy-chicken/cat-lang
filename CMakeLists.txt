@@ -51,6 +51,7 @@ file(GLOB_RECURSE SOURCES "${SOURCE_DIR}/*.cpp"
                           "${SOURCE_DIR}/back-end/*.cpp"
                           "${SOURCE_DIR}/vm/*.cpp")
 
+list(FILTER SOURCES EXCLUDE REGEX "${SOURCE_DIR}/analyzer/")
 # Add the executable
 add_executable(CatLang main.cpp ${SOURCES})
 
