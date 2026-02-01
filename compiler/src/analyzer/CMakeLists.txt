@@ -1,0 +1,3 @@
+add_subdirectory(counterpass)
+add_subdirectory(renamepass)
+add_subdirectory(injectfuncpass)

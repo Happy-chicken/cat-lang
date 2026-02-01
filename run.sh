@@ -1,6 +1,3 @@
+cd /home/buyi/code/catlang/build
+cmake .. -G Ninja -DCMAKE_C_COMPILER=clang-20 -DCMAKE_CXX_COMPILER=clang++-20
 
-cmake --build ./build;
-./build/CatLang build ./test/test.cat;
-# lli-14 -extra-archive /usr/lib/x86_64-linux-gnu/libgc.a ./output.ll;
-clang++-14 -O3 -I/usr/include/gc ./output.ll /usr/lib/x86_64-linux-gnu/libgc.a -o catlang;
-./catlang;
