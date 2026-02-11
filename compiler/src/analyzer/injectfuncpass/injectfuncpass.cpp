@@ -31,7 +31,7 @@ namespace llvm {
         // Inject a global var to hold printf format string
         Constant *printfFormatStr = ConstantDataArray::getString(
             ctx,
-            "Hello from %s\nnumber of arguments%d"
+            "Hello from %s\nnumber of arguments%d\n"
         );
         Constant *printfFormatStrVar = M.getOrInsertGlobal("PrintfFormatStr", printfFormatStr->getType());
         dyn_cast<GlobalVariable>(printfFormatStrVar)->setInitializer(printfFormatStr);
@@ -58,11 +58,11 @@ namespace llvm {
     // register
     PassPluginLibraryInfo getInjectFuncPassPluginInfo() {
         return {
-            LLVM_PLUGIN_API_VERSION, "injectfincpass", LLVM_VERSION_STRING,
+            LLVM_PLUGIN_API_VERSION, "injectfuncpass", LLVM_VERSION_STRING,
             [](PassBuilder &PB) {
                 PB.registerPipelineParsingCallback(
                     [](StringRef name, ModulePassManager &MPM, ArrayRef<PassBuilder::PipelineElement>) {
-                        if (name == "injectfincpass") {
+                        if (name == "injectfuncpass") {
                             MPM.addPass(InjectFuncPass());
                             return true;
                         }

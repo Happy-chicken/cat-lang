@@ -54,11 +54,48 @@ add_custom_target(test
 set(PASS_DIR "${PROJECT_SOURCE_DIR}/build/compiler/src/analyzer")
 add_custom_target(cpass
   COMMAND opt-20 -load-pass-plugin ${PASS_DIR}/counterpass/libcounterpass.so
-                 -passes="print<counter>" 
+                 -passes="print<counter>"
+                 -S
                  ${TEST_DIR}/foo.ll
-                 -o ${PROJECT_SOURCE_DIR}/build/counter.ll
+                 -o ${TEST_DIR}/counter.ll
   DEPENDS counterpass
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
-
+add_custom_target(ipass
+  COMMAND opt-20 -load-pass-plugin ${PASS_DIR}/injectfuncpass/libinjectfuncpass.so
+                 -passes="injectfuncpass"
+                 -S
+                 ${TEST_DIR}/foo.ll
+                 -o ${TEST_DIR}/inject.ll
+  DEPENDS injectfuncpass
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+add_custom_target(scpass
+  COMMAND opt-20 -load-pass-plugin ${PASS_DIR}/scallpass/libscallpass.so
+                 -passes="print<scallpass>"
+                 -S
+                 ${TEST_DIR}/foo.ll
+                 -o ${TEST_DIR}/scall.ll
+  DEPENDS scallpass
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+add_custom_target(dcpass
+  COMMAND opt-20 -load-pass-plugin ${PASS_DIR}/dcallpass/libdcallpass.so
+                 -passes="dcallpass"
+                 -S
+                 ${TEST_DIR}/foo.ll
+                 -o ${TEST_DIR}/dcall.ll
+  DEPENDS scallpass
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+add_custom_target(mba
+  COMMAND opt-20 -load-pass-plugin ${PASS_DIR}/mbapass/libmbapass.so
+                 -passes="mbapass"
+                 -S
+                 -debugify-each
+                 ${TEST_DIR}/foo.ll
+                 -o ${TEST_DIR}/mba.ll
+  DEPENDS mbapass
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
 add_subdirectory(src/analyzer)

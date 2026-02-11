@@ -1,5 +1,5 @@
-; ModuleID = '../test/foo.cpp'
-source_filename = "../test/foo.cpp"
+; ModuleID = '/home/buyi/code/catlang/test/foo.ll'
+source_filename = "foo.cpp"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-linux-gnu"
 
@@ -13,7 +13,7 @@ define dso_local noundef i32 @_Z2f1ii(i32 noundef %0, i32 noundef %1) #0 {
   store i32 %1, ptr %4, align 4
   %5 = load i32, ptr %3, align 4
   %6 = load i32, ptr %4, align 4
-  %7 = sub nsw i32 %5, %6
+  %7 = add nsw i32 %5, %6
   ret i32 %7
 }
 

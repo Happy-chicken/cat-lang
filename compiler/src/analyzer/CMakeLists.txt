@@ -1,3 +1,6 @@
 add_subdirectory(counterpass)
 add_subdirectory(renamepass)
 add_subdirectory(injectfuncpass)
+add_subdirectory(scallpass)
+add_subdirectory(dcallpass)
+add_subdirectory(mbapass)

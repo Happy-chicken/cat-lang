@@ -1,4 +1,4 @@
-; ModuleID = '../test/foo.cpp'
+; ModuleID = '/home/buyi/code/catlang/test/foo.ll'
 source_filename = "../test/foo.cpp"
 target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-linux-gnu"
@@ -13,8 +13,10 @@ define dso_local noundef i32 @_Z2f1ii(i32 noundef %0, i32 noundef %1) #0 {
   store i32 %1, ptr %4, align 4
   %5 = load i32, ptr %3, align 4
   %6 = load i32, ptr %4, align 4
-  %7 = sub nsw i32 %5, %6
-  ret i32 %7
+  %7 = xor i32 %6, -1
+  %8 = add i32 %5, %7
+  %9 = add i32 %8, 1
+  ret i32 %9
 }
 
 ; Function Attrs: mustprogress noinline nounwind optnone uwtable
@@ -30,10 +32,24 @@ define dso_local noundef i32 @_Z2f2ii(i32 noundef %0, i32 noundef %1) #0 {
   store i32 %8, ptr %5, align 4
   %9 = load i32, ptr %3, align 4
   %10 = load i32, ptr %4, align 4
-  %11 = add nsw i32 %9, %10
-  %12 = load i32, ptr %5, align 4
-  %13 = add nsw i32 %11, %12
-  ret i32 %13
+  %11 = xor i32 %9, %10
+  %12 = and i32 %9, %10
+  %13 = mul i32 2, %12
+  %14 = add i32 %11, %13
+  %15 = mul i32 39, %14
+  %16 = add i32 23, %15
+  %17 = mul i32 151, %16
+  %18 = add i32 111, %17
+  %19 = load i32, ptr %5, align 4
+  %20 = xor i32 %18, %19
+  %21 = and i32 %18, %19
+  %22 = mul i32 2, %21
+  %23 = add i32 %20, %22
+  %24 = mul i32 39, %23
+  %25 = add i32 23, %24
+  %26 = mul i32 151, %25
+  %27 = add i32 111, %26
+  ret i32 %27
 }
 
 ; Function Attrs: mustprogress noinline norecurse optnone uwtable
