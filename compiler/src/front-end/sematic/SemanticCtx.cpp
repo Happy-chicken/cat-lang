@@ -3,56 +3,56 @@
 #include "Location.hpp"
 
 InsertResult SemanticCtx::declareSymbol(uptr<Symbol> sym, bool isRedeclared) {
-    if (!sym) {
-        return InsertResult::error();
-    }
+  if (!sym) {
+    return InsertResult::error();
+  }
 
-    const string name = sym->getName();
-    const Location loc = sym->getLocation();
-    auto result = symbol_table.declare(std::move(sym));
+  const string name = sym->getName();
+  const Location loc = sym->getLocation();
+  auto result = symbol_table.declare(std::move(sym));
 
-    if (isRedeclared && result.isRedeclared()) {
-        diagnostics.report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, loc, "symbol '" + name + "' already declared in this scope.");
-        if (result.symbol) {
-            diagnostics.report(Diagnostics::Severity::Info, Diagnostics::Phase::SemanticAnalysis, result.symbol->getLocation(), "previous declaration is here.");
-        }
-        throw std::runtime_error("semantic analysis failed");
+  if (isRedeclared && result.isRedeclared()) {
+    Diag::getInstance()->report(Diagnostics::Severity::Error, Diagnostics::Phase::SemanticAnalysis, loc, "symbol '" + name + "' already declared in this scope.");
+    if (result.symbol) {
+      Diag::getInstance()->report(Diagnostics::Severity::Info, Diagnostics::Phase::SemanticAnalysis, result.symbol->getLocation(), "previous declaration is here.");
     }
-    return result;
+    throw std::runtime_error("semantic analysis failed");
+  }
+  return result;
 }
 
 LookupResult SemanticCtx::lookup(const string &name) const {
-    return symbol_table.lookup(name);
+  return symbol_table.lookup(name);
 }
 
 LookupResult SemanticCtx::lookupLocalSymbol(const string &name) const {
-    return symbol_table.currentScope().lookupLocal(name);
+  return symbol_table.currentScope().lookupLocal(name);
 }
 
 bool SemanticCtx::replaceSymbol(const string &name, uptr<Symbol> newSymbol) {
-    return symbol_table.replaceSymbol(name, std::move(newSymbol));
+  return symbol_table.replaceSymbol(name, std::move(newSymbol));
 }
 
 void SemanticCtx::enterFunction(sptr<FunctionFrame> frame) {
-    function_stack.push_back(frame);
+  function_stack.push_back(frame);
 }
 
 void SemanticCtx::leaveFunction() {
-    if (!function_stack.empty()) {
-        function_stack.pop_back();
-    }
+  if (!function_stack.empty()) {
+    function_stack.pop_back();
+  }
 }
 
 sptr<SemanticCtx::FunctionFrame> SemanticCtx::currentFunction() {
-    if (function_stack.empty()) {
-        return nullptr;
-    }
-    return function_stack.back();
+  if (function_stack.empty()) {
+    return nullptr;
+  }
+  return function_stack.back();
 }
 
 const sptr<SemanticCtx::FunctionFrame> SemanticCtx::currentFunction() const {
-    if (function_stack.empty()) {
-        return nullptr;
-    }
-    return function_stack.back();
+  if (function_stack.empty()) {
+    return nullptr;
+  }
+  return function_stack.back();
 }

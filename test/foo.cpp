@@ -9,8 +9,11 @@ int f2(int x, int y) {
   return x + y + t;
 }
 
-int main(int argc, char *argv[]) {
-  int res = f2(1, 2);
-  printf("In main:%d", res);
+int main() {
+  int temp = 3;
+  int temp2 = temp + 4;
+
+  // int res = f2(1, 2);
+  // printf("In main:%d", res);
   return 0;
 }

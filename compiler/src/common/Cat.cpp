@@ -67,88 +67,86 @@ ________________________________________
 // }
 
 void Cat::build(const string &program, llvm::OptimizationLevel optLevel) {
-    // define diagnostics
-    auto diagnostics = Diagnostics();
-    cat::setGlobalDiagnostics(&diagnostics);
-    try {
-        // ---------------------------------------------------------------------------
+  // define diagnostics
+  try {
+    // ---------------------------------------------------------------------------
 
-        // lexer analysis
-        auto scanner = Scanner(program);
-        // ---------------------------------------------------------------------------
+    // lexer analysis
+    auto scanner = Scanner(program);
+    // ---------------------------------------------------------------------------
 
-        // syntax analysis
-        auto parser = Parser(scanner);
-        auto root = parser.parse();
-        root->print(std::cout);
-        // ---------------------------------------------------------------------------
+    // syntax analysis
+    auto parser = Parser(scanner);
+    auto root = parser.parse();
+    root->print(std::cout);
+    // ---------------------------------------------------------------------------
 
-        // semantic analysis
-        // 知道变量类型，作用域，函数调用，重定义，未定义等行为
-        auto passDriver = PassDriver(*root);
-        auto symbolTable = SymbolTable();
-        auto semanticCtx = SemanticCtx(symbolTable, diagnostics);
-        Catime::declareBuiltins(semanticCtx);
-        passDriver.runSemanticPass(semanticCtx);
-        passDriver.runControlFlowPass(semanticCtx);
-        // semanticCtx.dumpSymbolTable(std::cout);
-        // semanticCtx.dumpFuncFrames(std::cout);
-        // ---------------------------------------------------------------------------
+    // semantic analysis
+    // 知道变量类型，作用域，函数调用，重定义，未定义等行为
+    auto passDriver = PassDriver(*root);
+    auto symbolTable = SymbolTable();
+    auto semanticCtx = SemanticCtx(symbolTable);
+    Catime::declareBuiltins(semanticCtx);
+    passDriver.runSemanticPass(semanticCtx);
+    passDriver.runControlFlowPass(semanticCtx);
+    // semanticCtx.dumpSymbolTable(std::cout);
+    // semanticCtx.dumpFuncFrames(std::cout);
+    // ---------------------------------------------------------------------------
 
-        // intermediate representation generation using LLVM
-        CodeGenCtx codeGenCtx("Cat_Module");
-        CodeGen codeGen(codeGenCtx);
-        Catime::genBuiltins(semanticCtx, codeGen);
-        codeGen.compile(root);
-        // ---------------------------------------------------------------------------
-        // optimize the generated IR
-        Optimizier optimizer;
-        optimizer.optimize(codeGenCtx.getModule(), optLevel);
-        if (llvm::verifyModule(codeGenCtx.getModule(), &llvm::errs())) {
-            std::cerr << "Error: Generated LLVM IR is invalid.\n";
-            exit(1);
-        }
-        optimizer.save(codeGenCtx.getModule());
-        // ---------------------------------------------------------------------------
-
-        // JIT
-        JIT catJit{codeGen};
-        llvm::InitLLVM X(argc, argv);
-        LLVMInitializeNativeTarget();
-        LLVMInitializeNativeAsmPrinter();
-        LLVMInitializeNativeAsmParser();
-        uptr<llvm::Module> M = catJit.loadModule();
-        auto llvmctx = codeGen.getContext().releaseLLVMContext();
-
-        llvm::ExitOnError ExitOnErr(std::string(argv[0]) + ": ");
-        ExitOnErr(catJit.run(std::move(M), std::move(llvmctx), argc, argv));
-
-    } catch (const std::runtime_error &e) {
-        diagnostics.printAll();
-        std::cerr << "Build failed: " << e.what() << std::endl;
-        return;
+    // intermediate representation generation using LLVM
+    CodeGenCtx codeGenCtx("Cat_Module");
+    CodeGen codeGen(codeGenCtx);
+    Catime::genBuiltins(semanticCtx, codeGen);
+    codeGen.compile(root);
+    // ---------------------------------------------------------------------------
+    // optimize the generated IR
+    Optimizier optimizer;
+    optimizer.optimize(codeGenCtx.getModule(), optLevel);
+    if (llvm::verifyModule(codeGenCtx.getModule(), &llvm::errs())) {
+      std::cerr << "Error: Generated LLVM IR is invalid.\n";
+      exit(1);
     }
+    optimizer.save(codeGenCtx.getModule());
+    // ---------------------------------------------------------------------------
+
+    // JIT
+    JIT catJit{codeGen};
+    llvm::InitLLVM X(argc, argv);
+    LLVMInitializeNativeTarget();
+    LLVMInitializeNativeAsmPrinter();
+    LLVMInitializeNativeAsmParser();
+    uptr<llvm::Module> M = catJit.loadModule();
+    auto llvmctx = codeGen.getContext().releaseLLVMContext();
+
+    llvm::ExitOnError ExitOnErr(std::string(argv[0]) + ": ");
+    ExitOnErr(catJit.run(std::move(M), std::move(llvmctx), argc, argv));
+
+  } catch (const std::runtime_error &e) {
+    Diag::getInstance()->printAll();
+    std::cerr << "Build failed: " << e.what() << std::endl;
+    return;
+  }
 }
 
 std::string Cat::readFile(std::string_view filename) {
-    std::ifstream file{filename.data(), std::ios::ate};
-    if (!file) {
-        std::cerr << "Failed to open file " << filename.data() << '\n';
-        std::exit(74);// I/O error
-    }
-    std::string buffer;
-    buffer.resize(file.tellg());
-    file.seekg(0, std::ios::beg);
-    file.read(buffer.data(), buffer.size());
-    file.close();
+  std::ifstream file{filename.data(), std::ios::ate};
+  if (!file) {
+    std::cerr << "Failed to open file " << filename.data() << '\n';
+    std::exit(74);// I/O error
+  }
+  std::string buffer;
+  buffer.resize(file.tellg());
+  file.seekg(0, std::ios::beg);
+  file.read(buffer.data(), buffer.size());
+  file.close();
 
-    return buffer;
+  return buffer;
 }
 
 
 void Cat::buildFile(string path, llvm::OptimizationLevel optLevel) {
-    std::string source = readFile(path);
-    build(source, optLevel);
+  std::string source = readFile(path);
+  build(source, optLevel);
 }
 
 // void Cat::runFile(string path) {

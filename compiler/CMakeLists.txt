@@ -98,4 +98,13 @@ add_custom_target(mba
   DEPENDS mbapass
   WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
+add_custom_target(riv
+  COMMAND opt-20 -load-pass-plugin ${PASS_DIR}/rivpass/librivpass.so
+                 -passes=rivpass
+                 -S
+                 ${TEST_DIR}/foo.ll
+                 -o ${TEST_DIR}/riv.ll
+  DEPENDS rivpass
+  WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
 add_subdirectory(src/analyzer)
