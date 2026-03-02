@@ -42,7 +42,7 @@ void ControlFlowPass::visit(Program &node) {
   }
 }
 
-void ControlFlowPass::visit(FuncParameterDef &node) {}
+void ControlFlowPass::visit(FuncParameterDecl &node) {}
 void ControlFlowPass::visit(Header &node) {}
 void ControlFlowPass::visit(VarDef &node) {}
 void ControlFlowPass::visit(FuncDecl &node) {}
@@ -71,7 +71,7 @@ void ControlFlowPass::visit(FuncDef &node) {
   functionStack.pop_back();
 }
 
-void ControlFlowPass::visit(ClassDef &node) {}
+void ControlFlowPass::visit(ClassDecl &node) {}
 
 void ControlFlowPass::visit(Block &node) {
   for (const auto &stmt: node.statementsList()) {

@@ -9,7 +9,12 @@ namespace dcc {
   using nlohmann::json;
   Env line2Env(std::string line) {
     json j = json::parse(line);
-    std::unordered_map<std::string, int> inits = j.get<std::unordered_map<std::string, int>>();
+    std::unordered_map<std::string, int> inits_from_int = j.get<std::unordered_map<std::string, int>>();
+    std::unordered_map<std::string, Env::Value> inits;
+    for (auto [k, v]: inits_from_int) {
+      Env::Value tmp = v;
+      inits[k] = tmp;
+    }
     auto env = dcc::Env(inits);
     return env;
   }

@@ -31,12 +31,12 @@ class ControlFlowPass : public AstVisitor {
   void visit(Type &node) override;
   void visit(FuncParameterType &node) override;
   void visit(Program &node) override;
-  void visit(FuncParameterDef &node) override;
+  void visit(FuncParameterDecl &node) override;
   void visit(Header &node) override;
   void visit(VarDef &node) override;
   void visit(FuncDecl &node) override;
   void visit(FuncDef &node) override;
-  void visit(ClassDef &node) override;
+  void visit(ClassDecl &node) override;
   void visit(Block &node) override;
   void visit(SkipStmt &node) override;
   void visit(ExitStmt &node) override;

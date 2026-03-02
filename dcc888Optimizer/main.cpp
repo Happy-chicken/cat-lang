@@ -6,16 +6,20 @@
 #include <sstream>
 #include <string>
 #include <vector>
-void test_min(int n, int m) {
-  auto env = dcc::Env({{"m", m}, {"n", n}, {"zero", 0}});
+void test_min(int nn, int mm) {
+  dcc::Env::Value n = nn;
+  dcc::Env::Value m = mm;
+  dcc::Env::Value zero = 0;
+  auto env = dcc::Env({{"m", m}, {"n", n}, {"zero", zero}});
+  auto s = dcc::Storage({});
   auto m_min = dcc::Add("answer", "m", "zero");
   auto n_min = dcc::Add("answer", "n", "zero");
   auto p = dcc::Lth("p", "n", "m");
   auto b = dcc::Bt("p", &n_min, &m_min);
   p.addNext(&b);
-  dcc::interpret(&p, env);
+  dcc::interpret(&p, env, s);
   auto ans = env.getVar("answer");
-  printf("ans=%d\n", ans);
+  std::cout << *std::get_if<int>(&ans) << "\n";
 }
 static void dumpDfEnv(const dcc::DataFlowEnv &dfEnv) {
   std::stringstream ss;
@@ -30,7 +34,7 @@ static void dumpDfEnv(const dcc::DataFlowEnv &dfEnv) {
 }
 int main(int argc, char *argv[]) {
   int m = 1, n = 2;
-  // test_min(n, m);
+  test_min(n, m);
   std::ifstream file("/home/buyi/code/catlang/dcc888Optimizer/fib.txt");
   std::string line;
   std::vector<std::string> lines;
@@ -47,7 +51,7 @@ int main(int argc, char *argv[]) {
   dcc::DataFlowEnv chaosEnv = dcc::solveEquations(equations);
   // dumpDfEnv(chaosEnv);
   dcc::DataFlowEnv wlEnv = dcc::solveEquationsWithWorkList(equations);
-  dumpDfEnv(wlEnv);
+  // dumpDfEnv(wlEnv);
   // dcc::interpret(insts[0], env);
   // env.dump();
 

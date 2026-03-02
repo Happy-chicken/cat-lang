@@ -71,7 +71,7 @@ uptr<FuncDef> Parser::parseFuncDef() {
   return make_unique<FuncDef>(loc, std::move(header), std::move(body));
 }
 
-uptr<ClassDef> Parser::parseClassDef() {
+uptr<ClassDecl> Parser::parseClassDef() {
   auto loc = currentLocation();
   consume(CLASS, "Expected 'class'");
   string class_name = consume(IDENTIFIER, "Expected class name.").lexeme;
@@ -92,7 +92,7 @@ uptr<ClassDef> Parser::parseClassDef() {
   }
 
   consume(RIGHT_BRACE, "Expected '}' after class body.");
-  return make_unique<ClassDef>(loc, class_name, std::move(fields), std::move(methods));
+  return make_unique<ClassDecl>(loc, class_name, std::move(fields), std::move(methods));
 }
 
 
@@ -103,7 +103,8 @@ uptr<Header> Parser::parseHeader() {
     string func_name = token.lexeme;
     consume(LEFT_PAREN, "Expected '(' after function name.");
 
-    vec<uptr<FuncParameterDef>> parameters = {};
+    vec<uptr<FuncParameterDecl>> parameters = {};
+
     if (!check(RIGHT_PAREN)) {
       parameters = parseParameters();
     }
@@ -120,15 +121,15 @@ uptr<Header> Parser::parseHeader() {
   }
 }
 
-vec<uptr<FuncParameterDef>> Parser::parseParameters() {
-  vec<uptr<FuncParameterDef>> params;
+vec<uptr<FuncParameterDecl>> Parser::parseParameters() {
+  vec<uptr<FuncParameterDecl>> params;
   do {
-    params.push_back(parseFuncParameterDef());
+    params.push_back(parseFuncParameterDecl());
   } while (match({COMMA}));
   return params;
 }
 
-uptr<FuncParameterDef> Parser::parseFuncParameterDef() {
+uptr<FuncParameterDecl> Parser::parseFuncParameterDecl() {
   auto loc = currentLocation();
   vec<string> names;
   Token token = consume(IDENTIFIER, "Expected parameter name.");
@@ -137,7 +138,7 @@ uptr<FuncParameterDef> Parser::parseFuncParameterDef() {
   bool is_ref = match({REF});
 
   uptr<FuncParameterType> type = parseFuncParameterType(is_ref);
-  return make_unique<FuncParameterDef>(loc, std::move(names), std::move(type));
+  return make_unique<FuncParameterDecl>(loc, std::move(names), std::move(type));
 }
 
 uptr<FuncParameterType> Parser::parseFuncParameterType(bool is_ref) {

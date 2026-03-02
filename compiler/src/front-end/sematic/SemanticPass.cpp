@@ -34,7 +34,7 @@ void SemanticPass::visit(Program &node) {
   VerifyEntryPoint(defs);
 }
 void SemanticPass::visit(Header &node) {}
-void SemanticPass::visit(ClassDef &node) {
+void SemanticPass::visit(ClassDecl &node) {
   auto cls_name = node.identifier();
   auto &fields = node.fieldList();
   auto &methods = node.methodList();
@@ -350,7 +350,7 @@ void SemanticPass::visit(VarDef &node) {
     node.symbols().push_back(raw);
   }
 }
-void SemanticPass::visit(FuncParameterDef &node) {
+void SemanticPass::visit(FuncParameterDecl &node) {
   if (auto *t = node.parameterType()) {
     t->accept(*this);
   }
