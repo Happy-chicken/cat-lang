@@ -10,7 +10,6 @@
 #include <llvm/IR/Function.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Value.h>
-#include <unordered_map>
 #include <utility>
 template<typename T>
 using uptr = std::unique_ptr<T>;
@@ -21,7 +20,7 @@ struct ActiveFuncState {
   const FuncSymbol *funcSym;
   llvm::Value *framePtr = nullptr;     // Pointer to the current function's frame
   llvm::Value *staticLinkPtr = nullptr;// Pointer to the parent frame
-  std::unordered_map<const Symbol *, llvm::Value *>
+  llvm::DenseMap<const Symbol *, llvm::Value *>
       localVarAddrs;// Local variables address(i.e that var) map
 
   struct LoopInfo {
@@ -36,8 +35,8 @@ struct ActiveFuncState {
 
 class CodeGenCtx {
   public:
-  using FieldMap = std::unordered_map<std::string, llvm::Type *>;
-  using MethodMap = std::unordered_map<std::string, llvm::Function *>;
+  using FieldMap = llvm::StringMap<llvm::Type *>;
+  using MethodMap = llvm::StringMap<llvm::Function *>;
   static llvm::Function *curFunction;
 
   CodeGenCtx(const std::string &moduleName)
@@ -88,7 +87,7 @@ class CodeGenCtx {
       varsBuilder;// this builder always prepends to the beginning of the
                   // function entry block
 
-  using ClassMap = std::unordered_map<string, uptr<ClassInfo>>;
+  using ClassMap = llvm::StringMap<uptr<ClassInfo>>;
   vec<ActiveFuncState> funcStack;// Stack of active function states
   ClassMap classMap;             // Map of class symbols to their LLVM struct types
 
@@ -106,7 +105,7 @@ class CodeGenCtx {
   public:
   // Type Translation
   llvm::Type *getLLVMType(const SemaType &ty, bool forParam = false);
-  llvm::GlobalVariable *createGlobalVariable(const std::string &name, llvm::Constant *init);
+  llvm::GlobalVariable *createGlobalVariable(const llvm::StringRef name, llvm::Constant *init);
 
   llvm::Value *createLocalVariable(Symbol *sym, llvm::Type *type, Environment::Env env);
   llvm::Function *createFunction(const FuncSymbol *funcSym, llvm::FunctionType *fnType, Environment::Env env);
@@ -114,7 +113,7 @@ class CodeGenCtx {
 
   void createFunctionBlock(llvm::Function *fn);// create a function block
   llvm::BasicBlock *
-  createBasicBlock(const std::string &bbName,
+  createBasicBlock(const llvm::StringRef bbName,
                    llvm::Function *parentFunc);// create a basic block
 
   // methods related to class

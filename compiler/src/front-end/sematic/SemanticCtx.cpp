@@ -21,15 +21,15 @@ InsertResult SemanticCtx::declareSymbol(uptr<Symbol> sym, bool isRedeclared) {
   return result;
 }
 
-LookupResult SemanticCtx::lookup(const string &name) const {
+LookupResult SemanticCtx::lookup(const llvm::StringRef name) const {
   return symbol_table.lookup(name);
 }
 
-LookupResult SemanticCtx::lookupLocalSymbol(const string &name) const {
+LookupResult SemanticCtx::lookupLocalSymbol(const llvm::StringRef name) const {
   return symbol_table.currentScope().lookupLocal(name);
 }
 
-bool SemanticCtx::replaceSymbol(const string &name, uptr<Symbol> newSymbol) {
+bool SemanticCtx::replaceSymbol(const llvm::StringRef name, uptr<Symbol> newSymbol) {
   return symbol_table.replaceSymbol(name, std::move(newSymbol));
 }
 

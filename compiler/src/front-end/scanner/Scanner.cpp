@@ -10,7 +10,7 @@
 #include <stdexcept>
 using std::string;
 
-const unordered_map<string, TokenType> Scanner::keywords = {
+const llvm::StringMap<TokenType> Scanner::keywords = {
     {"and", AND},
     {"or", OR},
     {"false", FALSE},

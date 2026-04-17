@@ -17,9 +17,9 @@ class SemanticCtx {
   std::size_t scopeDepth() const { return symbol_table.scopeDepth(); }
 
   InsertResult declareSymbol(uptr<Symbol> sym, bool isRedeclared = false);
-  LookupResult lookup(const string &name) const;
-  LookupResult lookupLocalSymbol(const string &name) const;
-  bool replaceSymbol(const string &name, uptr<Symbol> newSymbol);
+  LookupResult lookup(const llvm::StringRef name) const;
+  LookupResult lookupLocalSymbol(const llvm::StringRef name) const;
+  bool replaceSymbol(const llvm::StringRef name, uptr<Symbol> newSymbol);
 
   struct FunctionFrame {
     FuncSymbol *symbol = nullptr;

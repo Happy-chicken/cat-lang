@@ -70,7 +70,7 @@ llvm::Type *CodeGenCtx::getLLVMType(const SemaType &ty, bool forParam) {
   }
   return nullptr;
 }
-llvm::GlobalVariable *CodeGenCtx::createGlobalVariable(const std::string &name, llvm::Constant *init) {
+llvm::GlobalVariable *CodeGenCtx::createGlobalVariable(const llvm::StringRef name, llvm::Constant *init) {
   module->getOrInsertGlobal(name, init->getType());
   auto variable = module->getNamedGlobal(name);
   variable->setAlignment(llvm::MaybeAlign(4));
@@ -120,7 +120,7 @@ void CodeGenCtx::createFunctionBlock(llvm::Function *fn) {
   builder->SetInsertPoint(entry);
 }
 
-llvm::BasicBlock *CodeGenCtx::createBasicBlock(const std::string &bbName, llvm::Function *parentFunc) {
+llvm::BasicBlock *CodeGenCtx::createBasicBlock(const llvm::StringRef bbName, llvm::Function *parentFunc) {
   return llvm::BasicBlock::Create(getLLVMContext(), bbName, parentFunc);
 }
 

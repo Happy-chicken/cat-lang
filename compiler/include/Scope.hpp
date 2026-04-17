@@ -2,47 +2,44 @@
 
 #include "Diagnostics.hpp"
 #include "Symbol.hpp"
-#include "Token.hpp"
+#include <llvm-20/llvm/ADT/StringMap.h>
+#include <llvm-20/llvm/ADT/StringRef.h>
 #include <memory>
-#include <string>
-#include <unordered_map>
 template<typename T>
 using sptr = std::shared_ptr<T>;
-using std::string;
-using std::unordered_map;
 
 class Scope : public std::enable_shared_from_this<Scope> {
-public:
-    Scope() = default;
-    explicit Scope(sptr<Scope> parent_scope);
-    Scope(sptr<Scope> parent_scope, unordered_map<string, Symbol *> symbolTable);
+  public:
+  Scope() = default;
+  explicit Scope(sptr<Scope> parent_scope);
+  Scope(sptr<Scope> parent_scope, llvm::StringMap<Symbol *> symbolTable);
 
-    InsertResult declare(Symbol *symbol);
-    LookupResult lookup(const string &name) const;
-    LookupResult lookupLocal(const string &name) const;
-    bool replace(const string &name, Symbol *newSymbol);
+  InsertResult declare(Symbol *symbol);
+  LookupResult lookup(const llvm::StringRef name) const;
+  LookupResult lookupLocal(const llvm::StringRef name) const;
+  bool replace(const llvm::StringRef name, Symbol *newSymbol);
 
-    // TODO
-    FuncSymbol *getEnclosingFunction() const { return nullptr; }
-    sptr<Scope> getParentScope() const { return parent_scope; }
+  // TODO
+  FuncSymbol *getEnclosingFunction() const { return nullptr; }
+  sptr<Scope> getParentScope() const { return parent_scope; }
 
-    const unordered_map<string, Symbol *> &getSymbolTable() const {
-        return symbolTable_;
+  const llvm::StringMap<Symbol *> &getSymbolTable() const {
+    return symbolTable_;
+  }
+
+  void dump(std::ostream &out) const {
+    auto *ps = shared_from_this().get();
+    while (ps) {
+      for (const auto &pair: symbolTable_) {
+        out << pair.getKey().str() << ":";
+        pair.second->dump(out);
+        out << "\n";
+      }
+      ps = ps->getParentScope().get();
     }
+  }
 
-    void dump(std::ostream &out) const {
-        auto *ps = shared_from_this().get();
-        while (ps) {
-            for (const auto &pair: symbolTable_) {
-                out << pair.first << ":";
-                pair.second->dump(out);
-                out << "\n";
-            }
-            ps = ps->getParentScope().get();
-        }
-    }
-
-private:
-    sptr<Scope> parent_scope = nullptr;          // parent Scope link(parent_)
-    unordered_map<string, Symbol *> symbolTable_;// symbol table
+  private:
+  sptr<Scope> parent_scope = nullptr;    // parent Scope link(parent_)
+  llvm::StringMap<Symbol *> symbolTable_;// symbol table
 };
