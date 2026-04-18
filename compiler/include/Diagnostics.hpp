@@ -66,7 +66,7 @@ struct LookupResult {
 class Diagnostics {
   public:
   using ptr = sptr<Diagnostics>;
-  
+
   enum class Severity {
     Info,
     Warning,

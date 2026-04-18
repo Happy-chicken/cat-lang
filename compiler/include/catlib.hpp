@@ -3,18 +3,18 @@
 #include "SemanticCtx.hpp"
 
 namespace Catime {
-    struct CatBuiltin {
-        const char *runtimeName;
-        const char *catName;
-    };
+  struct CatBuiltin {
+    const char *runtimeName;
+    const char *catName;
+  };
 
-    inline constexpr CatBuiltin builtinTable[] = {
-        {"cat_print", "print"},
+  inline constexpr CatBuiltin builtinTable[] = {
+      {"cat_print", "print"},
 
-    };
-    // class CodeGenCtx;
-    // class SemanticCtx;
+  };
+  // class CodeGenCtx;
+  // class SemanticCtx;
 
-    void declareBuiltins(SemanticCtx &semCtx);
-    void genBuiltins(SemanticCtx &semCtx, CodeGen &codegen);
+  void declareBuiltins(SemanticCtx &semCtx);
+  void genBuiltins(SemanticCtx &semCtx, CodeGen &codegen);
 }// namespace Catime

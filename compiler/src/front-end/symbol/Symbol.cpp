@@ -10,114 +10,114 @@ Symbol::Symbol(std::string name, SymKind kind, SemaTypePtr type, Location loc)
       loc_(loc) {}
 
 const std::string &Symbol::getName() const {
-    return name_;
+  return name_;
 }
 
 Symbol::SymKind Symbol::getKind() const {
-    return kind_;
+  return kind_;
 }
 
 const SemaTypePtr &Symbol::getType() const {
-    return type_;
+  return type_;
 }
 
 Location Symbol::getLocation() const {
-    return loc_;
+  return loc_;
 }
 
 FuncSymbol *Symbol::definingFunc() const {
-    return definingFunc_;
+  return definingFunc_;
 }
 
 void Symbol::setDefiningFunc(FuncSymbol *f) {
-    definingFunc_ = f;
+  definingFunc_ = f;
 }
 
 ClassSymbol *Symbol::definingClass() const {
-    return definingClass_;
+  return definingClass_;
 }
 
 void Symbol::setDefiningClass(ClassSymbol *c) {
-    definingClass_ = c;
+  definingClass_ = c;
 }
 
 bool Symbol::isVariable() const {
-    return kind_ == SymKind::VAR;
+  return kind_ == SymKind::VAR;
 }
 
 bool Symbol::isParameter() const {
-    return kind_ == SymKind::PARAM;
+  return kind_ == SymKind::PARAM;
 }
 
 bool Symbol::isMethod() const {
-    return kind_ == SymKind::METHOD;
+  return kind_ == SymKind::METHOD;
 }
 
 bool Symbol::isField() const {
-    return kind_ == SymKind::FIELD;
+  return kind_ == SymKind::FIELD;
 }
 
 void Symbol::markForwardDeclaration() {
-    isForward_ = true;
+  isForward_ = true;
 }
 
 void Symbol::markDefined() {
-    isDefined_ = true;
+  isDefined_ = true;
 }
 
 bool Symbol::isDefined() const {
-    return isDefined_;
+  return isDefined_;
 }
 
 Symbol::ParamPass ParamSymbol::getPass() const {
-    return pass_;
+  return pass_;
 }
 
 bool FuncSymbol::isProcedure() const {
-    return isProcedure_;
+  return isProcedure_;
 }
 
 void FuncSymbol::addParam(ParamSymbol *param) {
-    if (param) {
-        params_.push_back(param);
-    }
+  if (param) {
+    params_.push_back(param);
+  }
 }
 
 const std::vector<ParamSymbol *> &FuncSymbol::getParams() const {
-    return params_;
+  return params_;
 }
 
 void FuncSymbol::clearParams() {
-    params_.clear();
+  params_.clear();
 }
 
 void Symbol::dump(std::ostream &out) const {
-    out << "Symbol(name='" << name_ << "', kind=";
-    switch (kind_) {
-        case SymKind::VAR:
-            out << "VAR";
-            break;
-        case SymKind::PARAM:
-            out << "PARAM";
-            break;
-        case SymKind::FUNC:
-            out << "FUNC";
-            break;
-        case SymKind::CLASS:
-            out << "CLASS";
-            break;
-        case SymKind::METHOD:
-            out << "METHOD";
-            break;
-        case SymKind::FIELD:
-            out << "MEMBER";
-            break;
-    }
-    out << ", type=";
-    if (type_) {
-        type_->dump(out);
-    } else {
-        out << "null";
-    }
-    out << ")";
+  out << "Symbol(name='" << name_ << "', kind=";
+  switch (kind_) {
+    case SymKind::VAR:
+      out << "VAR";
+      break;
+    case SymKind::PARAM:
+      out << "PARAM";
+      break;
+    case SymKind::FUNC:
+      out << "FUNC";
+      break;
+    case SymKind::CLASS:
+      out << "CLASS";
+      break;
+    case SymKind::METHOD:
+      out << "METHOD";
+      break;
+    case SymKind::FIELD:
+      out << "MEMBER";
+      break;
+  }
+  out << ", type=";
+  if (type_) {
+    type_->dump(out);
+  } else {
+    out << "null";
+  }
+  out << ")";
 }
