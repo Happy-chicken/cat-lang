@@ -193,7 +193,8 @@ void SemanticPass::visit(FuncDecl &node) {
     paramTypes.push_back(p.type);
   }
   auto sig = makeFuncType(returnType, std::move(paramTypes));
-  auto func = std::make_unique<FuncSymbol>(name, std::move(sig), isProcedure, header->loc);
+  // TODO: now isVariadic is false by default
+  auto func = std::make_unique<FuncSymbol>(name, std::move(sig), isProcedure, false, header->loc);
 
   // Create temporary scope for parameters (orphaned after FuncDecl)
   semanticCtx.beginScope();
@@ -275,7 +276,8 @@ void SemanticPass::visit(FuncDef &node) {
       paramTypes.push_back(p.type);
     }
     auto sig = makeFuncType(returnType, std::move(paramTypes));
-    auto func = std::make_unique<FuncSymbol>(name, std::move(sig), isProcedure, header->loc);
+    // TODO: now isVariadic is false by default
+    auto func = std::make_unique<FuncSymbol>(name, std::move(sig), isProcedure, false, header->loc);
     fsym = func.get();
     semanticCtx.declareSymbol(std::move(func));
   }
@@ -480,7 +482,7 @@ void SemanticPass::visit(ProcCall &node) {
   }
   node.setFuncSymbol(funcSym);
   const auto &params = funcSym->getParams();
-  checkArguments(node.arguments(), params, node.identifier(), node.loc) ?: throw std::runtime_error("semantic analysis failed");
+  checkArguments(node.arguments(), params, node.identifier(), node.loc, funcSym->isVariadic()) ?: throw std::runtime_error("semantic analysis failed");
 }
 
 void SemanticPass::visit(BinaryExpr &node) {
@@ -775,7 +777,7 @@ void SemanticPass::visit(FuncCall &node) {
   }
   node.setFuncSymbol(funcSym);
   const auto &params = funcSym->getParams();
-  checkArguments(node.arguments(), params, node.identifier(), node.loc);
+  checkArguments(node.arguments(), params, node.identifier(), node.loc, funcSym->isVariadic());
   const auto *sig = static_cast<const FuncType *>(funcSym->getType().get());
   node.setType(sig ? sig->returnType() : SemaTypePtr{});
   node.setLValue(false);
@@ -903,7 +905,7 @@ void SemanticPass::visit(MethodCall &node) {
   }
   node.setMethodSymbol(methodSym);
   const auto &params = methodSym->getParams();
-  checkArguments(node.arguments(), params, node.methodName(), node.loc);
+  checkArguments(node.arguments(), params, node.methodName(), node.loc, methodSym->isVariadic());
 
   const auto *sig = static_cast<const FuncType *>(methodSym->getType().get());
   node.setType(sig ? sig->returnType() : SemaTypePtr{});
@@ -930,7 +932,7 @@ void SemanticPass::visit(NewExpr &node) {
     for (auto *mSym: clsSym->getMethods()) {
       if (mSym->getName() == "constructor") {
         auto &params = mSym->getParams();
-        checkArguments(args, params, "constructor of " + clsName, node.loc);
+        checkArguments(args, params, "constructor of " + clsName, node.loc, false);
         break;
       }
     }
@@ -1281,7 +1283,15 @@ bool SemanticPass::signaturesMatch(bool isProcedure, const SemaTypePtr &returnTy
 
   return true;
 }
-bool SemanticPass::checkArguments(const vec<uptr<Expr>> &args, const std::vector<ParamSymbol *> &params, const std::string &callee, const Location &loc) {
+bool SemanticPass::checkArguments(const vec<uptr<Expr>> &args, const std::vector<ParamSymbol *> &params, const std::string &callee, const Location &loc, bool isVarArg) {
+  // FIXME: may have bug, not sure
+  if (isVarArg) {
+    for (std::size_t i = 0; i < args.size(); ++i) {
+      auto arg = args[i].get();
+      if (arg) arg->accept(*this);
+    }
+    return true;
+  }
   if (args.size() != params.size()) {
     Diag::getInstance()->report(
         Diagnostics::Severity::Error,

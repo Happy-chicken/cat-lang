@@ -77,6 +77,18 @@ bool FuncSymbol::isProcedure() const {
   return isProcedure_;
 }
 
+bool FuncSymbol::isVariadic() const {
+  return isVariadic_;
+}
+
+bool FuncSymbol::isBuiltin() const {
+  return isBuiltin_;
+}
+
+void FuncSymbol::setBuiltin(bool is_builtin) {
+  isBuiltin_ = is_builtin;
+}
+
 void FuncSymbol::addParam(ParamSymbol *param) {
   if (param) {
     params_.push_back(param);

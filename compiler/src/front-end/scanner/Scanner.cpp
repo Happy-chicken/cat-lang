@@ -8,6 +8,7 @@
 #include "Scanner.hpp"
 #include "Token.hpp"
 #include <stdexcept>
+#include <utility>
 using std::string;
 
 const llvm::StringMap<TokenType> Scanner::keywords = {
@@ -93,6 +94,11 @@ Token Scanner::makeToken(TokenType type) {
   string text = source.substr(start, current - start);
   start = current;
   return Token(type, text, line, column);
+}
+
+Token Scanner::makeToken(TokenType type, std::string value) {
+  start = current;
+  return Token(type, std::move(value), line, column);
 }
 
 bool Scanner::match(char expected) {
@@ -262,11 +268,48 @@ Token Scanner::String() {
   advance();
 
   // Trim the surrounding quotes.
-  string value = source.substr(start + 1, current - start - 2);
-  if (value.length() == 1) {
-    return makeToken(CHAR);
+  string raw = source.substr(start + 1, current - start - 2);
+  string value;
+  value.reserve(raw.size());
+  for (size_t i = 0; i < raw.size(); ++i) {
+    if (raw[i] == '\\' && i + 1 < raw.size()) {
+      switch (raw[i + 1]) {
+        case 'n':
+          value += '\n';
+          ++i;
+          break;
+        case 't':
+          value += '\t';
+          ++i;
+          break;
+        case 'r':
+          value += '\r';
+          ++i;
+          break;
+        case '\\':
+          value += '\\';
+          ++i;
+          break;
+        case '"':
+          value += '"';
+          ++i;
+          break;
+        case '0':
+          value += '\0';
+          ++i;
+          break;
+        default:
+          value += raw[i];
+          break;
+      }
+    } else {
+      value += raw[i];
+    }
   }
-  return makeToken(STRING);
+  if (value.length() == 1) {
+    return makeToken(CHAR, std::move(value));
+  }
+  return makeToken(STRING, std::move(value));
 }
 
 Token Scanner::Number() {

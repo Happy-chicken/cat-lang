@@ -112,4 +112,6 @@ private:
   Environment::Env globalEnv = nullptr;    // global environment
   Environment::Env &currentEnv = globalEnv;// current environment
   llvm::Value *makeCall(FuncSymbol *calleeSym, const vec<uptr<Expr>> &args);
+  llvm::Value *makeBuiltinCall(FuncSymbol *calleeSym, const vec<uptr<Expr>> &args);
+  llvm::Value *emitPrint(FuncSymbol *calleeSym, const vec<uptr<Expr>> &args);
 };

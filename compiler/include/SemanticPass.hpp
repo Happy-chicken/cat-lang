@@ -115,7 +115,7 @@ class SemanticPass : public AstVisitor {
   // Semantic analysis helpers
   bool collectParams(const Header &header, std::vector<ParamInfo> &params);
   bool signaturesMatch(bool isProcedure, const SemaTypePtr &returnType, const std::vector<ParamInfo> &params, const Symbol *symbol);
-  bool checkArguments(const vec<uptr<Expr>> &args, const std::vector<ParamSymbol *> &params, const std::string &callee, const Location &loc);
+  bool checkArguments(const vec<uptr<Expr>> &args, const std::vector<ParamSymbol *> &params, const std::string &callee, const Location &loc, bool isVarArg);
 
   //
   void VerifyEntryPoint(const vec<uptr<ASTNode>> &defs);

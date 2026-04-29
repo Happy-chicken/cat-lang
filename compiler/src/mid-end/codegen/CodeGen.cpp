@@ -761,6 +761,56 @@ CodeGen::ensureLLVMFunction(FuncSymbol *funcSym, const CodeGenCtx::FuncSignature
   return llvmFunc;
 }
 
+llvm::Value *CodeGen::emitPrint(FuncSymbol *calleeSym, const vec<uptr<Expr>> &args) {
+  auto &builder = ctx.getBuilder();
+  auto &llctx = ctx.getLLVMContext();
+  auto &module = ctx.getModule();
+
+  std::vector<llvm::Value *> printArgs;
+
+  for (size_t i = 0; i < args.size(); ++i) {
+    auto *expr = args[i].get();
+
+    if (i == 0) {
+      auto *strLit = dynamic_cast<LValueExpr *>(expr);
+      assert(strLit && "print function's first argument must be a string literal");
+
+      llvm::Constant *strConst = llvm::ConstantDataArray::getString(
+          llctx, dynamic_cast<StringLiteralLVal *>(strLit->lvalue())->literal(), /*AddNull=*/true
+      );
+      auto *gv = new llvm::GlobalVariable(
+          module,
+          strConst->getType(),
+          /*isConstant=*/true,
+          llvm::GlobalValue::PrivateLinkage,
+          strConst,
+          ".fmt"
+      );
+      gv->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+      gv->setAlignment(llvm::Align(1));
+
+      printArgs.push_back(gv);
+
+    } else {
+      expr->accept(*this);
+      printArgs.push_back(lastValue);
+    }
+  }
+
+  llvm::Function *printFn = currentEnv->lookupFunc(calleeSym);
+  llvm::FunctionType *printTy = printFn->getFunctionType();
+
+  // variadic 函数必须显式传 FunctionType
+  return builder.CreateCall(printTy, printFn, printArgs);
+}
+
+llvm::Value *CodeGen::makeBuiltinCall(FuncSymbol *calleeSym, const vec<uptr<Expr>> &args) {
+  if (calleeSym->getName() == "print") {
+    return emitPrint(calleeSym, args);
+  }
+  return nullptr;
+}
+
 llvm::Value *CodeGen::makeCall(FuncSymbol *calleeSym, const vec<uptr<Expr>> &args) {
   if (!calleeSym)
     return nullptr;
@@ -769,8 +819,11 @@ llvm::Value *CodeGen::makeCall(FuncSymbol *calleeSym, const vec<uptr<Expr>> &arg
   // return type
   llvm::Function *callee = currentEnv->lookupFunc(calleeSym);
   if (!callee)
-
     return nullptr;
+
+  if (calleeSym->isBuiltin()) {
+    return makeBuiltinCall(calleeSym, args);
+  }
 
   auto *functionTy = callee->getFunctionType();
   vec<llvm::Value *> callArgs;

@@ -15,6 +15,6 @@ def main() {
     var a:A = new A( 1)
     var c:int
     c = a.m()
-    print(c)
-    print(a.b)
+    //print(c)
+    print("%d\n", a.b)
 }

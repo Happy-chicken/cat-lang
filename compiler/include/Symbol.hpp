@@ -96,23 +96,27 @@ class ParamSymbol : public Symbol {
 // Note: A FuncSymbol's type is its signature type (return type + parameter types)
 class FuncSymbol : public Symbol {
   public:
-  FuncSymbol(std::string name, SemaTypePtr sigType, bool isProc, Location loc)
-      : Symbol(std::move(name), SymKind::FUNC, std::move(sigType), loc), isProcedure_(isProc) {};
+  FuncSymbol(std::string name, SemaTypePtr sigType, bool isProc, bool isVariadic, Location loc)
+      : Symbol(std::move(name), SymKind::FUNC, std::move(sigType), loc), isProcedure_(isProc), isVariadic_(isVariadic) {};
 
   void addParam(ParamSymbol *param);
   const std::vector<ParamSymbol *> &getParams() const;
   bool isProcedure() const;
+  bool isVariadic() const;
+  bool isBuiltin() const;
+  void setBuiltin(bool is_builtin);
   void clearParams();
 
   protected:
   // Protected constructor for derived classes (e.g., MethodSymbol)
   FuncSymbol(std::string name, SymKind kind, SemaTypePtr sigType, bool isProc, Location loc)
-      : Symbol(std::move(name), kind, std::move(sigType), loc), isProcedure_(isProc) {};
+      : Symbol(std::move(name), kind, std::move(sigType), loc), isProcedure_(isProc), isVariadic_(false) {};
 
   private:
   std::vector<ParamSymbol *> params_;
   bool isProcedure_;
   bool isVariadic_;
+  bool isBuiltin_{false};
 };
 
 // Method is a function defined in a class (has implicit 'this' parameter)

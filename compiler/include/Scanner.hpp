@@ -18,6 +18,7 @@ class Scanner {
   int column = 1;
   char advance();
   Token makeToken(TokenType type);
+  Token makeToken(TokenType type, string value);
   bool match(char expected);
 
   Token String();
